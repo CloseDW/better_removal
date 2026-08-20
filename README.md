@@ -1,73 +1,73 @@
 # Better Removal
 
-Fabric 1.20.1 ：**让玩家潜行 + 空手右键容器**即可直接把容器里的物品取出到背包，**而无需打开 GUI**。
+Fabric 1.20.1: **Sneak + empty-hand right-click** a container to directly extract its items into your inventory — **without opening the GUI**.
 
-## 支持
+## Supported Containers
 
-### 原版
+### Vanilla
 
-| 容器 |
+| Container |
 |---|
-| 熔炉 / 高炉 / 烟熏炉 |
-| 酿造台 |
-| 漏斗 / 发射器 / 投掷器 | 
+| Furnace / Blast Furnace / Smoker |
+| Brewing Stand |
+| Hopper / Dispenser / Dropper |
 
 ### Farmer's Delight
 
-| 容器 |
+| Container |
 |---|
-| 厨锅 |
-| 木篮 / 竹篮 |
+| Cooking Pot |
+| Wooden / Bamboo Basket |
 
 ### Ad Astra
 
-| 容器 |
+| Container |
 |---|
-| 压缩机 | 
-| 电离高炉 |
-| 燃料精炼机 |
-| 氧气装载机 |
-| 低温冷冻机 |
+| Compressor |
+| Etrionic Blast Furnace |
+| Fuel Refinery |
+| Oxygen Loader |
+| Cryo Freezer |
 
 ### Crabber's Delight
 
-| 容器 |
+| Container |
 |---|
-| 捕蟹笼 |
+| Crab Trap |
 
 ### The Aether
 
-| 容器 |
+| Container |
 |---|
-| 冷冻器 |
-| 祭坛（神能炉） |
+| Freezer |
+| Altar (Incubator) |
 
 ### Vinery
 
-| 容器 |
+| Container |
 |---|
-| 陈酿桶 |
-| 苹果压榨器 |
+| Fermentation Barrel |
+| Apple Press |
 
 ### Fossils and Archeology: Revival
 
-| 容器 |
+| Container |
 |---|
-| 分析仪 |
-| 筛子 |
-| 培养槽 |
-| 考古工作台 |
+| Analyzer |
+| Sifter |
+| Culture Vat |
+| Archeology Workbench |
 
 ---
 
-## 配置
+## Configuration
 
-通过 **Configured**模组编辑
+Edit via the **Configured** mod.
 
 ---
 
-## 许可证
+## License
 
 MIT License — Copyright (c) 2026 CloseDW
 
-详见 [LICENSE](LICENSE)。
+See [LICENSE](LICENSE).

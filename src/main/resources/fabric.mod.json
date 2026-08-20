@@ -3,7 +3,7 @@
 	"id": "better-removal",
 	"version": "${version}",
 	"name": "better removal",
-	"description": "潜行+空手右键容器可以在不打开GUI的情况下直接取出物品",
+	"description": "Sneak + empty-hand right-click a container to directly extract its items without opening the GUI.",
 	"authors": [
 		"CloseDW"
 	],
