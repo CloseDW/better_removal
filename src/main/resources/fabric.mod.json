@@ -1,0 +1,39 @@
+{
+	"schemaVersion": 1,
+	"id": "better-removal",
+	"version": "${version}",
+	"name": "better removal",
+	"description": "潜行+空手右键容器可以在不打开GUI的情况下直接取出物品",
+	"authors": [
+		"CloseDW"
+	],
+	"contact": {
+		"homepage": "https://github.com/CloseDW/better_removal",
+		"sources": "https://github.com/CloseDW/better_removal",
+		"issues": "https://github.com/CloseDW/better_removal/issues"
+	},
+	"license": "MIT",
+	"icon": "assets/better-removal/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.example.BetterRemoval"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.19.3",
+		"minecraft": "~1.20.1",
+		"java": ">=17",
+		"fabric-api": "*"
+	},
+	"suggests": {
+		"configured": "*"
+	},
+	"custom": {
+		"configured": {
+			"providers": [
+				"com.example.config.BetterRemovalConfigProvider"
+			]
+		}
+	}
+}

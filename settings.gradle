@@ -1,0 +1,18 @@
+pluginManagement {
+	repositories {
+		maven {
+			name = 'Fabric'
+			url = 'https://maven.fabricmc.net/'
+		}
+		mavenCentral()
+		gradlePluginPortal()
+	}
+}
+
+plugins {
+	// 允许 Gradle 在需要时自动下载匹配版本的 JDK 工具链（本模组强制 JDK 17）
+	id 'org.gradle.toolchains.foojay-resolver-convention' version '0.8.0'
+}
+
+// Should match your modid
+rootProject.name = 'better-removal'
