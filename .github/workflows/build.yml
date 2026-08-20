@@ -17,8 +17,11 @@ jobs:
       - name: setup jdk
         uses: actions/setup-java@v5
         with:
-          java-version: '17'
+          # Fabric Loom 1.17-SNAPSHOT 要求 JVM 21 运行 Gradle。
+          # 编译仍使用 build.gradle 的 JDK 17 toolchain（由 foojay resolver 自动下载）。
+          java-version: '21'
           distribution: 'microsoft'
+          cache: gradle
       - name: make gradle wrapper executable
         run: chmod +x ./gradlew
       - name: build
