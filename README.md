@@ -1,6 +1,6 @@
 # Better Removal
 
-Fabric 1.20.1: **Sneak + empty-hand right-click** a container to directly extract its items into your inventory — **without opening the GUI**.
+Fabric 1.21.1: **Sneak + empty-hand right-click** a container to directly extract its items into your inventory — **without opening the GUI**.
 
 ## Supported Containers
 
@@ -57,6 +57,8 @@ Fabric 1.20.1: **Sneak + empty-hand right-click** a container to directly extrac
 | Sifter |
 | Culture Vat |
 | Archeology Workbench |
+
+> Note: Ad Astra, Crabber's Delight and Fossils & Archeology: Revival do **not** yet have a Fabric build for 1.21.1, so those containers are only supported once those mods update. The rest (including vanilla) work as normal.
 
 ---
 

@@ -17,16 +17,16 @@
 	"environment": "*",
 	"entrypoints": {
 		"main": [
-			"com.example.BetterRemoval"
+			"common.BetterRemoval"
 		],
 		"client": [
-			"com.example.BetterRemovalClient"
+			"common.client.BetterRemovalClient"
 		]
 	},
 	"depends": {
 		"fabricloader": ">=0.19.3",
-		"minecraft": "~1.20.1",
-		"java": ">=17",
+		"minecraft": "~1.21.1",
+		"java": ">=21",
 		"fabric-api": "*"
 	},
 	"suggests": {
@@ -35,7 +35,7 @@
 	"custom": {
 		"configured": {
 			"providers": [
-				"com.example.config.BetterRemovalConfigProvider"
+				"common.config.BetterRemovalConfigProvider"
 			]
 		}
 	}

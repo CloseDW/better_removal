@@ -12,10 +12,19 @@ repositories {
 }
 
 loom {
+	splitEnvironmentSourceSets()
+
 	mods {
 		"better-removal" {
 			sourceSet sourceSets.main
+			sourceSet sourceSets.client
 		}
+	}
+}
+
+fabricApi {
+	configureDataGeneration {
+		client = true
 	}
 }
 
@@ -29,7 +38,7 @@ dependencies {
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 
 	// Configured (MrCrayfish) - 编译期使用其配置 API，运行时由用户自行安装
-	modCompileOnly files("libs/configured-fabric-1.20.1-2.2.3.jar")
+	modCompileOnly files("libs/configured-fabric-1.21.1-2.6.3.jar")
 }
 
 processResources {
@@ -42,7 +51,7 @@ processResources {
 }
 
 tasks.withType(JavaCompile).configureEach {
-	it.options.release = 17
+	it.options.release = 21
 }
 
 java {
@@ -51,14 +60,8 @@ java {
 	// If you remove this line, sources will not be generated.
 	withSourcesJar()
 
-	sourceCompatibility = JavaVersion.VERSION_17
-	targetCompatibility = JavaVersion.VERSION_17
-
-	// 强制使用 JDK 17 编译与运行。JDK 21 会导致 Fabric Loader 运行时重映射
-	// 抛出 java.nio.file.ClosedFileSystemException（详见最新日志）。
-	toolchain {
-		languageVersion = JavaLanguageVersion.of(17)
-	}
+	sourceCompatibility = JavaVersion.VERSION_21
+	targetCompatibility = JavaVersion.VERSION_21
 }
 
 jar {
