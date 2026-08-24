@@ -18,6 +18,9 @@
 	"entrypoints": {
 		"main": [
 			"com.example.BetterRemoval"
+		],
+		"client": [
+			"com.example.BetterRemovalClient"
 		]
 	},
 	"depends": {

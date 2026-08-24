@@ -15,9 +15,11 @@ import com.example.fossil.AnalyzerSupport;
 import com.example.fossil.CultureVatSupport;
 import com.example.fossil.SifterSupport;
 import com.example.fossil.WorktableSupport;
+import com.example.networking.ExtractKeyStateManager;
 import com.example.vinery.ApplePressSupport;
 import com.example.vinery.FermentationBarrelSupport;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.block.entity.BlastFurnaceBlockEntity;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.block.entity.BrewingStandBlockEntity;
@@ -37,7 +39,7 @@ import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.world.World;
 
 /**
- * 潜行 + 空手右键容器，直接把输出槽的物品全部取出到玩家背包同时不用打开容器的 GUI。
+ * 潜行+空手右键容器可以直接把输出槽的物品全部取出同时不用打开容器的 GUI。
  * 容器可通过Configured的配置菜单开关
  */
 public final class OutputSlotExtractor {
@@ -179,8 +181,8 @@ public final class OutputSlotExtractor {
 	}
 
 	private static ActionResult onUseBlock(PlayerEntity player, World world, Hand hand, BlockHitResult hitResult) {
-		// 仅潜行
-		if (!player.isSneaking()) {
+		// 仅潜行；同时安装Carry On时改用左Alt键（避免与Carry On的Shift+右键搬起冲突）
+		if (isCarryOnLoaded() ? !ExtractKeyStateManager.isAltKeyDown(player) : !player.isSneaking()) {
 			return ActionResult.PASS;
 		}
 		// 只处理主手
@@ -271,7 +273,6 @@ public final class OutputSlotExtractor {
 	}
 
 	/**
-
 	 * 使用 insertStack
      * 不使用offer，offer在背包放不下时会dropItem直接扔到地上
 	 */
@@ -280,6 +281,10 @@ public final class OutputSlotExtractor {
 		ItemStack toInsert = result.copy();
 		player.getInventory().insertStack(toInsert);
 		return originalCount - toInsert.getCount();
+	}
+
+	private static boolean isCarryOnLoaded() {
+		return FabricLoader.getInstance().isModLoaded("carryon");
 	}
 
 	private static void finish(PlayerEntity player, World world, Runnable markDirty) {

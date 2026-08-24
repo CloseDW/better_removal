@@ -1,4 +1,6 @@
 {
+  "key.better-removal.category": "Better Removal",
+  "key.better-removal.extract": "取出物品（Carry On兼容）",
   "config.better-removal.category.vanilla": "原版",
   "config.better-removal.category.farmersdelight": "农夫乐事",
   "config.better-removal.category.ad_astra": "Ad Astra",

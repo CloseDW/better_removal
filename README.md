@@ -66,6 +66,12 @@ Edit via the **Configured** mod.
 
 ---
 
+## Compatibility
+
+When this mod is installed together with **Carry On**, its activation is changed to **Left Alt + empty-hand right-click**.
+
+---
+
 ## License
 
 MIT License — Copyright (c) 2026 CloseDW

@@ -1,5 +1,6 @@
 package com.example;
 
+import com.example.networking.ExtractKeyStateManager;
 import net.fabricmc.api.ModInitializer;
 
 import net.minecraft.util.Identifier;
@@ -24,6 +25,7 @@ public class BetterRemoval implements ModInitializer {
 		LOGGER.info("Loading Better Removal");
 
 		OutputSlotExtractor.register();
+		ExtractKeyStateManager.registerServerHandlers();
 	}
 
 	public static Identifier id(String path) {
