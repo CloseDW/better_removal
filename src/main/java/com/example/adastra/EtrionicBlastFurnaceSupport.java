@@ -5,15 +5,12 @@ import net.minecraft.block.entity.BlockEntity;
 
 /**
  * Ad Astra 电力高炉的兼容。
- *
  * 使用反射访问，因此即使玩家没有安装Ad Astra，本模组也能正常运行：
  * - 类加载 / 方法调用全部放在try/catch 中，缺失依赖时静默返回。
- *
- * 电离高炉槽位布局（EtrionicBlastFurnaceBlockEntity）：
+ * 电力高炉槽位布局（EtrionicBlastFurnaceBlockEntity）：
  *   0      电槽
  *   1-4    输入槽
  *   5-8    输出槽
- *
  * 该方块实体实现了原版 {@link net.minecraft.inventory.Inventory} 接口（Yarn 映射），
  */
 public final class EtrionicBlastFurnaceSupport {
