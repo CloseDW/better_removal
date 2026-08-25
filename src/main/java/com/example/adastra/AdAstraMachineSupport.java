@@ -5,9 +5,7 @@ import net.minecraft.block.entity.BlockEntity;
 
 /**
  * Ad Astra机器方块实体的通用反射。
- *
  * 压缩机、电离高炉、燃料精炼机、氧气装载机、低温冷冻机等都继承自{@code MachineBlockEntity}，其中包含一个 public的{@code sync()}方法：
- *
  * 本模组使用原版{@link net.minecraft.inventory.Inventory}接口直接取出输出槽物品时，
  * 没有经过Ad Astra机器自身的update/sync流程。因此在取物后需要调用sync()让机器把正确的方块实体数据推送给客户端。
  */
