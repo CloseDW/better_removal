@@ -58,7 +58,7 @@ Fabric 1.21.1: **Sneak + empty-hand right-click** a container to directly extrac
 | Culture Vat |
 | Archeology Workbench |
 
-> Note: Ad Astra, Crabber's Delight and Fossils & Archeology: Revival do **not** yet have a Fabric build for 1.21.1, so those containers are only supported once those mods update. The rest (including vanilla) work as normal.
+> Note: Ad Astra, Crabber's Delight and Fossils & Archeology: Revival do **not** yet have a Fabric build for 1.21.1.
 
 ---
 
