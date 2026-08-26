@@ -12,11 +12,10 @@ import net.minecraft.world.World;
  *
  * 使用反射访问，类加载 / 方法调用全部放在try/catch
  * 厨锅槽位布局（CookingPotBlockEntity）：
- *   0-5  输入槽（食材）
+ *   0-5  输入槽
  *   6    成品显示槽
  *   7    容器槽
  *   8    成品输出槽
- *
  * 该方块通过 {@code getInventory()} 返回自定义的ItemStackHandler（vectorwing.farmersdelight.refabricated.inventory.ItemStackHandler）。
  * 这里通过反射调用getStackInSlot / setStackInSlot取出成品输出槽的物品。
  */
@@ -100,6 +99,13 @@ public final class FarmersDelightSupport {
 	 * 只读取
 	 */
 	public static ItemStack getOutputSlot(World world, BlockPos pos, BlockEntity blockEntity) {
+		return getSlot(world, pos, blockEntity, OUTPUT_SLOT);
+	}
+
+	/**
+	 * 读取厨锅任意槽位的物品。返回 null 表示不可用。只读取。
+	 */
+	public static ItemStack getSlot(World world, BlockPos pos, BlockEntity blockEntity, int slot) {
 		if (!LOADED || blockEntity == null) {
 			return null;
 		}
@@ -112,7 +118,7 @@ public final class FarmersDelightSupport {
 			if (inventory == null) {
 				return null;
 			}
-			Object stackObj = inventory.getClass().getMethod("getStackInSlot", int.class).invoke(inventory, OUTPUT_SLOT);
+			Object stackObj = inventory.getClass().getMethod("getStackInSlot", int.class).invoke(inventory, slot);
 			ItemStack stack = (ItemStack) stackObj;
 			if (stack == null || stack.isEmpty()) {
 				return null;
@@ -125,10 +131,17 @@ public final class FarmersDelightSupport {
 	}
 
 	/**
-	 * 把成品输出槽8的物品减少count
+	 * 把厨锅输出槽8的物品减少count
 	 * 为0时槽位置空。setStackInSlot会触发onContentsChanged -> inventoryChanged。
 	 */
 	public static void removeFromOutputSlot(World world, BlockPos pos, BlockEntity blockEntity, int count) {
+		removeFromSlot(world, pos, blockEntity, OUTPUT_SLOT, count);
+	}
+
+	/**
+	 * 把厨锅任意槽位的物品减少count
+	 */
+	public static void removeFromSlot(World world, BlockPos pos, BlockEntity blockEntity, int slot, int count) {
 		if (!LOADED || blockEntity == null || count <= 0) {
 			return;
 		}
@@ -141,19 +154,19 @@ public final class FarmersDelightSupport {
 			if (inventory == null) {
 				return;
 			}
-			Object stackObj = inventory.getClass().getMethod("getStackInSlot", int.class).invoke(inventory, OUTPUT_SLOT);
+			Object stackObj = inventory.getClass().getMethod("getStackInSlot", int.class).invoke(inventory, slot);
 			ItemStack stack = (ItemStack) stackObj;
 			if (stack == null || stack.isEmpty()) {
 				return;
 			}
 			if (count >= stack.getCount()) {
 				inventory.getClass().getMethod("setStackInSlot", int.class, ItemStack.class)
-						.invoke(inventory, OUTPUT_SLOT, ItemStack.EMPTY);
+						.invoke(inventory, slot, ItemStack.EMPTY);
 			}
 			else {
 				stack.decrement(count);
 				inventory.getClass().getMethod("setStackInSlot", int.class, ItemStack.class)
-						.invoke(inventory, OUTPUT_SLOT, stack);
+						.invoke(inventory, slot, stack);
 			}
 		}
 		catch (Throwable t) {

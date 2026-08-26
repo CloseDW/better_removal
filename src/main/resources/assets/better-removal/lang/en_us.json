@@ -1,6 +1,13 @@
 {
   "key.better-removal.category": "Better Removal",
   "key.better-removal.extract": "Extract Items (Carry On Compat)",
+  "key.better-removal.mode": "Cycle Extraction Mode",
+  "better-removal.mode.output": "Extract Output Slots",
+  "better-removal.mode.input": "Extract Input Slots",
+  "better-removal.mode.fuel": "Extract Fuel Slots",
+  "better-removal.mode.all": "Extract All Items",
+  "better-removal.message.mode_prefix": "Current extraction mode: ",
+  "better-removal.message.current_mode_prefix": "Current extraction mode: ",
   "config.better-removal.category.vanilla": "Vanilla",
   "config.better-removal.category.farmersdelight": "Farmer's Delight",
   "config.better-removal.category.ad_astra": "Ad Astra",
