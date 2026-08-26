@@ -2,6 +2,20 @@
 
 Fabric 1.21.1: **Sneak + empty-hand right-click** a container to directly extract its items into your inventory — **without opening the GUI**.
 
+# Extraction Modes
+
+By default only the **output** slots are extracted. You can switch the extraction mode with the `/br` command or a keybinding:
+
+| Mode | Command | Extracts |
+|---|---|---|
+| Output (default) | `/br output` | Output slots only |
+| Input | `/br input` | Input slots only |
+| Fuel | `/br fuel` | Fuel slots only |
+| All | `/br all` | Every slot |
+
+- `/br now` — shows your current extraction mode.
+- A **keybinding** (unbound by default) cycles through the modes: `Output → Input → Fuel → All → Output ...`
+
 ## Supported Containers
 
 ### Vanilla
