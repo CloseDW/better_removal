@@ -1,6 +1,6 @@
-# Better Removal
+# Better Removal (Forge)
 
-Fabric 1.20.1: **Sneak + empty-hand right-click** a container to directly extract its items into your inventory — **without opening the GUI**.
+Forge 1.20.1: **Sneak + empty-hand right-click** a container to directly extract its items into your inventory — **without opening the GUI**.
 
 ## Extraction Modes
 
@@ -10,11 +10,13 @@ By default only the **output** slots are extracted. You can switch the extractio
 |---|---|---|
 | Output (default) | `/br output` | Output slots only |
 | Input | `/br input` | Input slots only |
-| Fuel | `/br fuel` | Fuel slots only |
+| Fuel | `/br fuel` | Fuel/container slots only |
 | All | `/br all` | Every slot |
 
 - `/br now` — shows your current extraction mode.
 - A **keybinding** (unbound by default) cycles through the modes: `Output → Input → Fuel → All → Output ...`
+
+Modes are saved per player and persist across server restarts.
 
 ## Supported Containers
 
@@ -54,7 +56,7 @@ By default only the **output** slots are extracted. You can switch the extractio
 | Container |
 |---|
 | Freezer |
-| Altar |
+| Altar (Incubator) |
 
 ### Vinery
 
