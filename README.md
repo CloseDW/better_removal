@@ -33,22 +33,6 @@ By default only the **output** slots are extracted. You can switch the extractio
 | Cooking Pot |
 | Wooden / Bamboo Basket |
 
-### Ad Astra
-
-| Container |
-|---|
-| Compressor |
-| Etrionic Blast Furnace |
-| Fuel Refinery |
-| Oxygen Loader |
-| Cryo Freezer |
-
-### Crabber's Delight
-
-| Container |
-|---|
-| Crab Trap |
-
 ### The Aether
 
 | Container |
@@ -62,17 +46,6 @@ By default only the **output** slots are extracted. You can switch the extractio
 |---|
 | Fermentation Barrel |
 | Apple Press |
-
-### Fossils and Archeology: Revival
-
-| Container |
-|---|
-| Analyzer |
-| Sifter |
-| Culture Vat |
-| Archeology Workbench |
-
-> Note: Ad Astra, Crabber's Delight and Fossils & Archeology: Revival do **not** yet have a Fabric build for 1.21.1.
 
 ---
 
