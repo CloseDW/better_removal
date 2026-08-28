@@ -15,7 +15,7 @@ import snownee.jade.api.IServerDataProvider;
 import java.util.List;
 
 /**
- * Jade 服务端数据提供器：把当前模式下将要取出的真实物品下发给客户端。
+ * Jade服务端数据提供器：把当前模式下将要取出的真实物品下发给客户端
  */
 public class BetterRemovalServerData implements IServerDataProvider<BlockAccessor> {
 

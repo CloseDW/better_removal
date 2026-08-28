@@ -7,7 +7,7 @@ import snownee.jade.api.IWailaCommonRegistration;
 import snownee.jade.api.IWailaPlugin;
 
 /**
- * Jade 插件入口。仅在安装了 Jade 且加载本插件的环境中运行。
+ * Jade入口。仅在安装了Jade的环境中运行。
  */
 public class BetterRemovalJadePlugin implements IWailaPlugin {
 

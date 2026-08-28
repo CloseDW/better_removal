@@ -26,7 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Jade 联动：当玩家空手按住修饰键（潜行；装了Carry On用左Alt）看向容器时，
+ * Jade联动：当玩家空手按住修饰键（潜行；装了Carry On用左Alt）看向容器时，
  * 在Jade提示框中添加一行高亮预览，圈出将要取出的物品。
  * 物品优先读取服务端通过 {@link BetterRemovalServerData} 的数据
  */

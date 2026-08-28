@@ -5,13 +5,10 @@ import net.minecraft.block.entity.BlockEntity;
 
 /**
  * Crabber's Delight捕蟹笼
- *
  * 使用反射访问，类加载 / 判断全部放在 try/catch
- *
  * 捕蟹笼槽位布局（CrabTrapBlockEntity）：
  *   0    诱饵槽
  *   1-9  捕获物槽
- *
  * 该方块实体实现了原版 {@link net.minecraft.inventory.SidedInventory}（Yarn 映射），
  * 因此可直接作为 {@link net.minecraft.inventory.Inventory} 用标准方法访问物品。
  */
