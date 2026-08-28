@@ -134,6 +134,10 @@ dependencies {
     // fg.deobf() 反混淆后 refmap 不会重映射，导致 ScreenMixin 崩溃（ForgeGradle 已知限制）。
     // 该模组为可选依赖，未安装时容器默认全部启用。
     compileOnly fg.deobf("configured:configured-forge-1.20.1-2.2.3:2.2.3")
+
+    // Jade - 编译期使用其 API 实现工具提示联动，运行时由用户自行安装。
+    // 与 Configured 同理，dev 运行时不要加载 Jade（mixin refmap 问题），正式环境安装即可。
+    compileOnly fg.deobf("jade:jade-forge-1.20.1:1.0")
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.

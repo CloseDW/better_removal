@@ -45,6 +45,13 @@ public final class ClientEvents {
 		}
 	}
 
+	/**
+	 * Carry On 兼容键是否处于按下状态（供 Jade 预览判断左Alt）。
+	 */
+	public static boolean isExtractKeyPressed() {
+		return extractKey != null && extractKey.isDown();
+	}
+
 	@Mod.EventBusSubscriber(modid = BetterRemoval.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
 	public static final class TickHandler {
 

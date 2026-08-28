@@ -52,4 +52,14 @@ public class BetterRemoval
             CarryOnCompat.remove(player.getUUID());
         }
     }
+
+    @SubscribeEvent
+    public void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event)
+    {
+        if (event.getEntity() instanceof ServerPlayer player)
+        {
+            // 进服时同步当前取出模式到客户端（供 Jade 预览）
+            ExtractionModeManager.setMode(player, ExtractionModeManager.getMode(player));
+        }
+    }
 }

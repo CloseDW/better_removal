@@ -33,5 +33,11 @@ public final class BetterRemovalNetwork {
 				.decoder(AltKeyStatePacket::new)
 				.consumerMainThread(AltKeyStatePacket::handle)
 				.add();
+
+		CHANNEL.messageBuilder(ExtractionModeSyncPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+				.encoder(ExtractionModeSyncPacket::encode)
+				.decoder(ExtractionModeSyncPacket::new)
+				.consumerMainThread(ExtractionModeSyncPacket::handle)
+				.add();
 	}
 }

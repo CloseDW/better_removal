@@ -1,11 +1,14 @@
 package com.better_removal;
 
+import com.better_removal.networking.BetterRemovalNetwork;
+import com.better_removal.networking.ExtractionModeSyncPacket;
 import com.mojang.logging.LogUtils;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.fml.loading.FMLPaths;
+import net.minecraftforge.network.PacketDistributor;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -29,6 +32,9 @@ public final class ExtractionModeManager {
 
 	private static final Path PATH = FMLPaths.CONFIGDIR.get().resolve(FILE_NAME);
 	private static final Map<UUID, ExtractionMode> MODES = new ConcurrentHashMap<>();
+
+	/** 客户端缓存的当前模式（由服务端通过 S2C 包同步） */
+	private static volatile ExtractionMode CLIENT_MODE = ExtractionMode.OUTPUT;
 
 	static {
 		load();
@@ -75,9 +81,21 @@ public final class ExtractionModeManager {
 		return MODES.getOrDefault(player.getUUID(), ExtractionMode.OUTPUT);
 	}
 
+	/**
+	 * 客户端缓存的当前模式（供 Jade 联动等客户端功能读取）。
+	 */
+	public static ExtractionMode getClientMode() {
+		return CLIENT_MODE;
+	}
+
+	public static void setClientMode(ExtractionMode mode) {
+		CLIENT_MODE = mode;
+	}
+
 	public static void setMode(ServerPlayer player, ExtractionMode mode) {
 		MODES.put(player.getUUID(), mode);
 		save();
+		BetterRemovalNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new ExtractionModeSyncPacket(mode));
 	}
 
 	/**
