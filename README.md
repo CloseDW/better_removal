@@ -80,6 +80,11 @@ Modes are saved per player and persist across server restarts.
 
 Edit via the **Configured** mod.
 
+### Jade
+
+With **Jade** installed, holding the modifier key (Sneak, or Left Alt with Carry On) while looking at a supported container with empty hands shows a highlighted "Will extract:" line in the tooltip, previewing the items that would be extracted for the current mode. This can be toggled via the **Jade Preview** option in the Configured config.
+
+> Note: For the preview to show real container contents, **Jade must be installed on both the client and the server**.
 ---
 
 ## Compatibility
