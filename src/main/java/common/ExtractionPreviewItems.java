@@ -10,7 +10,7 @@ import java.util.List;
 
 /**
  * 计算当前模式下将要取出的物品（服务端取物逻辑与 Jade 预览共用）。
- * 返回 null 表示该容器不受支持/未启用。
+ * 返回 null 表示该容器不受支持/未启用
  */
 public final class ExtractionPreviewItems {
 
