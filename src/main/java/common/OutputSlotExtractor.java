@@ -55,7 +55,7 @@ public final class OutputSlotExtractor {
 	/**
 	 * 查询某个容器是否启用。未安装Configured时默认全部启用
 	 */
-	private static boolean isContainerEnabled(String key) {
+	public static boolean isContainerEnabled(String key) {
 		try {
 			return BetterRemovalConfig.get().isEnabled(key);
 		}
@@ -67,7 +67,7 @@ public final class OutputSlotExtractor {
 	/**
 	 * 返回指定方块实体在当前模式下要取出的槽位。
 	 */
-	private static int[] getSlotsForMode(BlockEntity blockEntity, ExtractionMode mode) {
+	public static int[] getSlotsForMode(BlockEntity blockEntity, ExtractionMode mode) {
 		if (mode == ExtractionMode.ALL) {
 			return allSlots(blockEntity);
 		}

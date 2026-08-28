@@ -21,6 +21,9 @@
 		],
 		"client": [
 			"common.client.BetterRemovalClient"
+		],
+		"jade": [
+			"common.jade.BetterRemovalJadePlugin"
 		]
 	},
 	"depends": {

@@ -45,6 +45,8 @@ public class BetterRemovalConfig implements IModConfig
 
     static
     {
+        CATEGORIES.put("general", List.of("jade_preview"));
+
         CATEGORIES.put("vanilla", List.of(
                 "furnace", "blast_furnace", "smoker", "brewing_stand",
                 "hopper", "dispenser", "dropper"));
@@ -61,6 +63,7 @@ public class BetterRemovalConfig implements IModConfig
 
         CATEGORIES.put("fossil", List.of("analyzer", "sifter", "culture_vat", "worktable"));
 
+        DEFAULT_VALUES.put("jade_preview", true);
         DEFAULT_VALUES.put("furnace", true);
         DEFAULT_VALUES.put("blast_furnace", true);
         DEFAULT_VALUES.put("smoker", true);
@@ -201,8 +204,7 @@ public class BetterRemovalConfig implements IModConfig
     }
 
     @Override
-    public ActionResult loadWorldConfig(Path path) throws IOException
-    {
+    public ActionResult loadWorldConfig(Path path) {
         return ActionResult.success();
     }
 

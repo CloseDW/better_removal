@@ -59,6 +59,12 @@ Edit via the **Configured** mod.
 
 When this mod is installed together with **Carry On**, its activation is changed to **Left Alt + empty-hand right-click**.
 
+### Jade
+
+With **Jade** installed, holding the modifier key (Sneak, or Left Alt with Carry On) while looking at a supported container with empty hands shows a highlighted "Will extract:" line in the tooltip, previewing the items that would be extracted for the current mode. This can be toggled via the **Jade Preview** option in the Configured config.
+
+> Note: For the preview to show real container contents, **Jade must be installed on both the client and the server**.
+
 ---
 
 ## License

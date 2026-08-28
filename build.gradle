@@ -39,6 +39,9 @@ dependencies {
 
 	// Configured (MrCrayfish) - 编译期使用其配置 API，运行时由用户自行安装
 	modCompileOnly files("libs/configured-fabric-1.21.1-2.6.3.jar")
+
+	// Jade - 编译期使用其 API 实现工具提示联动，运行时由用户自行安装
+	modCompileOnly files("libs/jade-fabric-1.21.1.jar")
 }
 
 processResources {

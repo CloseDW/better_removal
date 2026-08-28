@@ -1,7 +1,9 @@
 package common;
 
 import common.networking.ExtractionModeCycleC2SPayload;
+import common.networking.ExtractionModeSyncS2CPayload;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.entity.player.PlayerEntity;
@@ -34,6 +36,9 @@ public final class ExtractionModeManager {
 
 	private static final Path PATH = FabricLoader.getInstance().getConfigDir().resolve(FILE_NAME);
 	private static final Map<UUID, ExtractionMode> MODES = new ConcurrentHashMap<>();
+
+	/** 客户端缓存的当前模式（由服务端通过 S2C 包同步） */
+	private static volatile ExtractionMode CLIENT_MODE = ExtractionMode.OUTPUT;
 
 	static {
 		load();
@@ -81,10 +86,23 @@ public final class ExtractionModeManager {
 	}
 
 	/**
+	 * 客户端缓存的当前模式（供 Jade 联动等客户端功能读取）。
+	 */
+	public static ExtractionMode getClientMode() {
+		return CLIENT_MODE;
+	}
+
+	public static void setClientMode(ExtractionMode mode) {
+		CLIENT_MODE = mode;
+	}
+
+	/**
 	 * 注册按键切换数据包的接收器：循环切换到下一个模式并回发提示。
+	 * 并处理玩家加入时的模式同步。
 	 */
 	public static void registerServerHandlers() {
 		PayloadTypeRegistry.playC2S().register(ExtractionModeCycleC2SPayload.ID, ExtractionModeCycleC2SPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(ExtractionModeSyncS2CPayload.ID, ExtractionModeSyncS2CPayload.CODEC);
 
 		ServerPlayNetworking.registerGlobalReceiver(ExtractionModeCycleC2SPayload.ID, (payload, context) -> {
 			ServerPlayerEntity player = context.player();
@@ -92,11 +110,14 @@ public final class ExtractionModeManager {
 			setMode(player, next);
 			player.sendMessage(getModeMessage(next), false);
 		});
+
+		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> ServerPlayNetworking.send(handler.player, new ExtractionModeSyncS2CPayload(getMode(handler.player))));
 	}
 
 	public static void setMode(ServerPlayerEntity player, ExtractionMode mode) {
 		MODES.put(player.getUuid(), mode);
 		save();
+		ServerPlayNetworking.send(player, new ExtractionModeSyncS2CPayload(mode));
 	}
 
 	/**
