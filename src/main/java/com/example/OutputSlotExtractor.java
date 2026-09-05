@@ -70,7 +70,9 @@ public final class OutputSlotExtractor {
 	 */
 	public static int[] getSlotsForMode(BlockEntity blockEntity, ExtractionMode mode) {
 		if (mode == ExtractionMode.ALL) {
-			return allSlots(blockEntity);
+			// ALL受容器开关约束，不允许绕过配置
+			String key = getConfigKey(blockEntity);
+			return key != null && isContainerEnabled(key) ? allSlots(blockEntity) : null;
 		}
 
 		// ---------- 原版 ----------
@@ -192,6 +194,87 @@ public final class OutputSlotExtractor {
 					: new int[] { 1 };
 		}
 
+		return null;
+	}
+
+	/**
+	 * 返回容器对应的配置键（与getSlotsForMode中的分支一一对应），未列出的容器返回null。
+	 * ALL 模式用它检查容器开关，避免绕过配置取出。
+	 */
+	private static String getConfigKey(BlockEntity blockEntity) {
+		// ---------- 原版 ----------
+		if (blockEntity instanceof FurnaceBlockEntity) {
+			return "furnace";
+		}
+		if (blockEntity instanceof BlastFurnaceBlockEntity) {
+			return "blast_furnace";
+		}
+		if (blockEntity instanceof SmokerBlockEntity) {
+			return "smoker";
+		}
+		if (blockEntity instanceof BrewingStandBlockEntity) {
+			return "brewing_stand";
+		}
+		if (blockEntity instanceof DropperBlockEntity) {
+			return "dropper";
+		}
+		if (blockEntity instanceof DispenserBlockEntity) {
+			return "dispenser";
+		}
+		if (blockEntity instanceof HopperBlockEntity) {
+			return "hopper";
+		}
+		// Farmer's Delight木篮竹篮
+		if (FarmersDelightSupport.isBasket(blockEntity)) {
+			return "basket";
+		}
+		// ---------- Ad Astra ----------
+		if (CompressorSupport.isCompressor(blockEntity)) {
+			return "compressor";
+		}
+		if (EtrionicBlastFurnaceSupport.isEtrionicBlastFurnace(blockEntity)) {
+			return "etrionic_blast_furnace";
+		}
+		if (FuelRefinerySupport.isFuelRefinery(blockEntity)) {
+			return "fuel_refinery";
+		}
+		if (OxygenLoaderSupport.isOxygenLoader(blockEntity)) {
+			return "oxygen_loader";
+		}
+		if (CryoFreezerSupport.isCryoFreezer(blockEntity)) {
+			return "cryo_freezer";
+		}
+		// ---------- Crabber's Delight ----------
+		if (CrabTrapSupport.isCrabTrap(blockEntity)) {
+			return "crab_trap";
+		}
+		// ---------- The Aether ----------
+		if (FreezerSupport.isFreezer(blockEntity)) {
+			return "freezer";
+		}
+		if (AltarSupport.isAltar(blockEntity)) {
+			return "altar";
+		}
+		// ---------- Vinery ----------
+		if (FermentationBarrelSupport.isFermentationBarrel(blockEntity)) {
+			return "fermentation_barrel";
+		}
+		if (ApplePressSupport.isApplePress(blockEntity)) {
+			return "apple_press";
+		}
+		// ---------- Fossils and Archeology: Revival ----------
+		if (AnalyzerSupport.isAnalyzer(blockEntity)) {
+			return "analyzer";
+		}
+		if (SifterSupport.isSifter(blockEntity)) {
+			return "sifter";
+		}
+		if (CultureVatSupport.isCultureVat(blockEntity)) {
+			return "culture_vat";
+		}
+		if (WorktableSupport.isWorktable(blockEntity)) {
+			return "worktable";
+		}
 		return null;
 	}
 
