@@ -84,9 +84,15 @@ Edit via the **Configured** mod.
 
 When this mod is installed together with **Carry On**, its activation is changed to **Left Alt + empty-hand right-click**.
 
+### FTB Ultimine
+
+With **FTB Ultimine** installed, holding **both** modifier keys — the Better Removal modifier (Sneak, or Left Alt with Carry On) **and** the Ultimine key (default `~`) — while right-clicking a supported container with empty hands extracts the items from **every supported container in the current Ultimine shape** , according to the current extraction mode. 
+
+> Note: FTB Ultimine must be installed on both the client and the server, since the key state and the chain shape are managed server-side.
+
 ### Jade
 
-With **Jade** installed, holding the modifier key (Sneak, or Left Alt with Carry On) while looking at a supported container with empty hands shows a highlighted "Will extract:" line in the tooltip, previewing the items that would be extracted for the current mode. This can be toggled via the **Jade Preview** option in the Configured config.
+With **Jade** installed, holding the modifier key (Sneak, or Left Alt with Carry On) while looking at a supported container with empty hands shows a highlighted "Will extract:" line in the tooltip, previewing the items that would be extracted for the current mode. When an FTB Ultimine chain extraction would trigger (both keys held), the preview shows the combined items of all chained containers. This can be toggled via the **Jade Preview** option in the Configured config.
 
 > Note: For the preview to show real container contents, **Jade must be installed on both the client and the server**. 
 
