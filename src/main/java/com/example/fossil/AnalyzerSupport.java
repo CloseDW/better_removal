@@ -30,11 +30,6 @@ public final class AnalyzerSupport {
 	 */
 	private static final String ANALYZER_CLASS = "com.github.teamfossilsarcheology.fossil.block.entity.AnalyzerBlockEntity";
 
-	/**
-	 * 输出槽索引（9-12）。
-	 */
-	private static final int[] OUTPUT_SLOTS = { 9, 10, 11, 12 };
-
 	private static final boolean LOADED = checkLoaded();
 
 	private static boolean checkLoaded() {
@@ -67,12 +62,5 @@ public final class AnalyzerSupport {
 		catch (Throwable t) {
 			return false;
 		}
-	}
-
-	/**
-	 * 获取分析仪的输出槽索引（9-12）。
-	 */
-	public static int[] getOutputSlots() {
-		return OUTPUT_SLOTS;
 	}
 }

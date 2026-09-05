@@ -33,12 +33,6 @@ public final class FuelRefinerySupport {
 	 */
 	private static final String CLASS = "earth.terrarium.adastra.common.blockentities.machines.FuelRefineryBlockEntity";
 
-	/**
-	 * 槽2：空输出
-	 * 槽4：满输出
-	 */
-	private static final int[] OUTPUT_SLOTS = { 2, 4 };
-
 	private static final boolean LOADED = checkLoaded();
 
 	private static boolean checkLoaded() {
@@ -71,12 +65,5 @@ public final class FuelRefinerySupport {
 		catch (Throwable t) {
 			return false;
 		}
-	}
-
-	/**
-	 * 槽2（空容器）和槽4（满容器）。
-	 */
-	public static int[] getOutputSlots() {
-		return OUTPUT_SLOTS;
 	}
 }

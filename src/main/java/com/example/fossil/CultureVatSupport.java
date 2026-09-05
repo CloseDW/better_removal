@@ -29,11 +29,6 @@ public final class CultureVatSupport {
 	 */
 	private static final String CULTURE_VAT_CLASS = "com.github.teamfossilsarcheology.fossil.block.entity.CultureVatBlockEntity";
 
-	/**
-	 * 输出槽索引2
-	 */
-	private static final int OUTPUT_SLOT = 2;
-
 	private static final boolean LOADED = checkLoaded();
 
 	private static boolean checkLoaded() {
@@ -59,9 +54,5 @@ public final class CultureVatSupport {
 		catch (Throwable t) {
 			return false;
 		}
-	}
-
-	public static int[] getOutputSlots() {
-		return new int[] { OUTPUT_SLOT };
 	}
 }

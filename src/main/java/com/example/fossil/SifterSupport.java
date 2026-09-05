@@ -27,11 +27,6 @@ public final class SifterSupport {
 	 */
 	private static final String SIFTER_CLASS = "com.github.teamfossilsarcheology.fossil.block.entity.SifterBlockEntity";
 
-	/**
-	 * 输出槽索引（1-5）
-	 */
-	private static final int[] OUTPUT_SLOTS = { 1, 2, 3, 4, 5 };
-
 	private static final boolean LOADED = checkLoaded();
 
 	private static boolean checkLoaded() {
@@ -57,9 +52,5 @@ public final class SifterSupport {
 		catch (Throwable t) {
 			return false;
 		}
-	}
-
-	public static int[] getOutputSlots() {
-		return OUTPUT_SLOTS;
 	}
 }

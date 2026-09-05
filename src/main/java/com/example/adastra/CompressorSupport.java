@@ -31,11 +31,6 @@ public final class CompressorSupport {
 	 */
 	private static final String COMPRESSOR_CLASS = "earth.terrarium.adastra.common.blockentities.machines.CompressorBlockEntity";
 
-	/**
-	 * 输出槽（CompressorBlockEntity）。
-	 */
-	private static final int OUTPUT_SLOT = 2;
-
 	private static final boolean LOADED = checkLoaded();
 
 	private static boolean checkLoaded() {
@@ -68,12 +63,5 @@ public final class CompressorSupport {
 		catch (Throwable t) {
 			return false;
 		}
-	}
-
-	/**
-	 * 槽 2 为输出槽。
-	 */
-	public static int[] getOutputSlots() {
-		return new int[] { OUTPUT_SLOT };
 	}
 }

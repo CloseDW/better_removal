@@ -40,11 +40,6 @@ public final class FarmersDelightSupport {
 	 */
 	private static final String BASKET_CLASS = "vectorwing.farmersdelight.common.block.entity.BasketBlockEntity";
 
-	/**
-	 * 成品输出槽索引（CookingPotBlockEntity.OUTPUT_SLOT）。
-	 */
-	private static final int OUTPUT_SLOT = 8;
-
 	private static final boolean LOADED = checkLoaded();
 
 	private static boolean checkLoaded() {
@@ -96,14 +91,6 @@ public final class FarmersDelightSupport {
 	}
 
 	/**
-	 * 读取厨锅成品输出槽8的物品。返回 null 表示不可用
-	 * 只读取
-	 */
-	public static ItemStack getOutputSlot(World world, BlockPos pos, BlockEntity blockEntity) {
-		return getSlot(world, pos, blockEntity, OUTPUT_SLOT);
-	}
-
-	/**
 	 * 读取厨锅任意槽位的物品。返回 null 表示不可用。只读取。
 	 */
 	public static ItemStack getSlot(World world, BlockPos pos, BlockEntity blockEntity, int slot) {
@@ -129,14 +116,6 @@ public final class FarmersDelightSupport {
 		catch (Throwable t) {
 			return null;
 		}
-	}
-
-	/**
-	 * 把厨锅输出槽8的物品减少count
-	 * 为0时槽位置空。setStackInSlot会触发onContentsChanged -> inventoryChanged。
-	 */
-	public static void removeFromOutputSlot(World world, BlockPos pos, BlockEntity blockEntity, int count) {
-		removeFromSlot(world, pos, blockEntity, OUTPUT_SLOT, count);
 	}
 
 	/**

@@ -30,11 +30,6 @@ public final class FreezerSupport {
 	 */
 	private static final String FREEZER_CLASS = "com.aetherteam.aether.blockentity.FreezerBlockEntity";
 
-	/**
-	 * 输出槽索引
-	 */
-	private static final int OUTPUT_SLOT = 2;
-
 	private static final boolean LOADED = checkLoaded();
 
 	private static boolean checkLoaded() {
@@ -67,12 +62,5 @@ public final class FreezerSupport {
 		catch (Throwable t) {
 			return false;
 		}
-	}
-
-	/**
-	 * 获取冷冻器的输出槽索引（2）。
-	 */
-	public static int[] getOutputSlots() {
-		return new int[] { OUTPUT_SLOT };
 	}
 }

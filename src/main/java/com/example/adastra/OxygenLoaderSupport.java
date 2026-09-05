@@ -33,11 +33,6 @@ public final class OxygenLoaderSupport {
 	 */
 	private static final String CLASS = "earth.terrarium.adastra.common.blockentities.machines.OxygenLoaderBlockEntity";
 
-	/**
-	 * 输出槽索引。
-	 */
-	private static final int[] OUTPUT_SLOTS = { 2, 4 };
-
 	private static final boolean LOADED = checkLoaded();
 
 	private static boolean checkLoaded() {
@@ -70,13 +65,5 @@ public final class OxygenLoaderSupport {
 		catch (Throwable t) {
 			return false;
 		}
-	}
-
-	/**
-	 * 获取氧气装载机的输出槽索引。
-	 * 槽2（空）和槽4（满）。
-	 */
-	public static int[] getOutputSlots() {
-		return OUTPUT_SLOTS;
 	}
 }

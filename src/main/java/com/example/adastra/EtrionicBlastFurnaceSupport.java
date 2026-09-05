@@ -28,11 +28,6 @@ public final class EtrionicBlastFurnaceSupport {
 	 */
 	private static final String CLASS = "earth.terrarium.adastra.common.blockentities.machines.EtrionicBlastFurnaceBlockEntity";
 
-	/**
-	 * 输出槽
-	 */
-	private static final int OUTPUT_SLOT = 5;
-
 	private static final boolean LOADED = checkLoaded();
 
 	private static boolean checkLoaded() {
@@ -65,12 +60,5 @@ public final class EtrionicBlastFurnaceSupport {
 		catch (Throwable t) {
 			return false;
 		}
-	}
-
-	/**
-	 * 返回所有4个输出槽。
-	 */
-	public static int[] getOutputSlots() {
-		return new int[] { 5, 6, 7, 8 };
 	}
 }

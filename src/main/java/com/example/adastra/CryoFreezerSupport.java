@@ -33,11 +33,6 @@ public final class CryoFreezerSupport {
 	 */
 	private static final String CLASS = "earth.terrarium.adastra.common.blockentities.machines.CryoFreezerBlockEntity";
 
-	/**
-	 * 输出槽
-	 */
-	private static final int OUTPUT_SLOT = 3;
-
 	private static final boolean LOADED = checkLoaded();
 
 	private static boolean checkLoaded() {
@@ -70,12 +65,5 @@ public final class CryoFreezerSupport {
 		catch (Throwable t) {
 			return false;
 		}
-	}
-
-	/**
-	 * 槽3
-	 */
-	public static int[] getOutputSlots() {
-		return new int[] { OUTPUT_SLOT };
 	}
 }

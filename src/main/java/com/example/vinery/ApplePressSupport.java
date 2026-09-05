@@ -30,11 +30,6 @@ public final class ApplePressSupport {
 	 */
 	private static final String CLASS = "net.satisfy.vinery.core.block.entity.ApplePressBlockEntity";
 
-	/**
-	 * 输出槽索引
-	 */
-	private static final int OUTPUT_SLOT = 3;
-
 	private static final boolean LOADED = FermentationBarrelSupport.isLoaded();
 
 	/**
@@ -51,12 +46,5 @@ public final class ApplePressSupport {
 		catch (Throwable t) {
 			return false;
 		}
-	}
-
-	/**
-	 * 获取苹果压榨器的输出槽索引3
-	 */
-	public static int[] getOutputSlots() {
-		return new int[] { OUTPUT_SLOT };
 	}
 }

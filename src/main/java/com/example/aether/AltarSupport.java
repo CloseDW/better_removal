@@ -31,11 +31,6 @@ public final class AltarSupport {
 	 */
 	private static final String ALTAR_CLASS = "com.aetherteam.aether.blockentity.AltarBlockEntity";
 
-	/**
-	 * 输出槽索引。
-	 */
-	private static final int OUTPUT_SLOT = 2;
-
 	private static final boolean LOADED = FreezerSupport.isLoaded();
 
 	/**
@@ -52,12 +47,5 @@ public final class AltarSupport {
 		catch (Throwable t) {
 			return false;
 		}
-	}
-
-	/**
-	 * 获取祭坛的输出槽索引（2）。
-	 */
-	public static int[] getOutputSlots() {
-		return new int[] { OUTPUT_SLOT };
 	}
 }

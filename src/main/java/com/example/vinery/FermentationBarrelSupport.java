@@ -31,11 +31,6 @@ public final class FermentationBarrelSupport {
 	 */
 	private static final String CLASS = "net.satisfy.vinery.core.block.entity.FermentationBarrelBlockEntity";
 
-	/**
-	 * 5
-	 */
-	private static final int OUTPUT_SLOT = 5;
-
 	private static final boolean LOADED = checkLoaded();
 
 	private static boolean checkLoaded() {
@@ -68,12 +63,5 @@ public final class FermentationBarrelSupport {
 		catch (Throwable t) {
 			return false;
 		}
-	}
-
-	/**
-	 * 输出槽5
-	 */
-	public static int[] getOutputSlots() {
-		return new int[] { OUTPUT_SLOT };
 	}
 }
