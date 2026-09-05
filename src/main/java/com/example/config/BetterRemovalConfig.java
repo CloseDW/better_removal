@@ -43,9 +43,14 @@ public class BetterRemovalConfig implements IModConfig
      */
     public static final Map<String, Boolean> DEFAULT_VALUES = new LinkedHashMap<>();
 
+    /**
+     * 整数配置键与默认值。
+     */
+    public static final Map<String, Integer> INT_DEFAULTS = new LinkedHashMap<>();
+
     static
     {
-        CATEGORIES.put("general", List.of("jade_preview"));
+        CATEGORIES.put("general", List.of("jade_preview", "ftb_ultimine", "ftb_ultimine_max_containers"));
 
         CATEGORIES.put("vanilla", List.of(
                 "furnace", "blast_furnace", "smoker", "brewing_stand",
@@ -64,6 +69,7 @@ public class BetterRemovalConfig implements IModConfig
         CATEGORIES.put("fossil", List.of("analyzer", "sifter", "culture_vat", "worktable"));
 
         DEFAULT_VALUES.put("jade_preview", true);
+        DEFAULT_VALUES.put("ftb_ultimine", true);
         DEFAULT_VALUES.put("furnace", true);
         DEFAULT_VALUES.put("blast_furnace", true);
         DEFAULT_VALUES.put("smoker", true);
@@ -87,9 +93,13 @@ public class BetterRemovalConfig implements IModConfig
         DEFAULT_VALUES.put("sifter", true);
         DEFAULT_VALUES.put("culture_vat", true);
         DEFAULT_VALUES.put("worktable", true);
+
+        // FTB Ultimine连锁取出单次最多容器数量（64）
+        INT_DEFAULTS.put("ftb_ultimine_max_containers", 64);
     }
 
     private final Map<String, BooleanValue> values = new LinkedHashMap<>();
+    private final Map<String, IntegerValue> intValues = new LinkedHashMap<>();
     private IConfigEntry root;
 
     private BetterRemovalConfig()
@@ -129,6 +139,19 @@ public class BetterRemovalConfig implements IModConfig
             boolean value = Boolean.parseBoolean(props.getProperty(key, String.valueOf(defaultValue)));
             this.values.put(key, new BooleanValue(key, defaultValue, value));
         });
+        INT_DEFAULTS.forEach((key, defaultValue) ->
+        {
+            int value = defaultValue;
+            try
+            {
+                value = Integer.parseInt(props.getProperty(key, String.valueOf(defaultValue)));
+            }
+            catch(NumberFormatException e)
+            {
+                LOGGER.warn("Invalid integer config value for {}, using default {}", key, defaultValue);
+            }
+            this.intValues.put(key, new IntegerValue(key, defaultValue, value));
+        });
     }
 
     /**
@@ -138,6 +161,15 @@ public class BetterRemovalConfig implements IModConfig
     {
         BooleanValue value = this.values.get(key);
         return value == null || value.get();
+    }
+
+    /**
+     * 查询整数配置（未配置时返回默认值）。
+     */
+    public int getInt(String key)
+    {
+        IntegerValue value = this.intValues.get(key);
+        return value != null ? value.get() : INT_DEFAULTS.getOrDefault(key, 0);
     }
 
     @Override
@@ -151,6 +183,7 @@ public class BetterRemovalConfig implements IModConfig
 
         Properties props = new Properties();
         this.values.forEach((key, value) -> props.setProperty(key, String.valueOf(value.get())));
+        this.intValues.forEach((key, value) -> props.setProperty(key, String.valueOf(value.get())));
         Path path = getPath();
         try
         {
@@ -175,7 +208,9 @@ public class BetterRemovalConfig implements IModConfig
             CATEGORIES.forEach((category, keys) ->
             {
                 List<IConfigEntry> entries = keys.stream()
-                        .map(key -> (IConfigEntry) new BooleanEntry(this.values.get(key)))
+                        .map(key -> (IConfigEntry) (INT_DEFAULTS.containsKey(key)
+                                ? new IntegerEntry(this.intValues.get(key))
+                                : new BooleanEntry(this.values.get(key))))
                         .toList();
                 children.add(new CategoryEntry(category, entries));
             });
@@ -265,6 +300,59 @@ public class BetterRemovalConfig implements IModConfig
         private final BooleanValue value;
 
         public BooleanEntry(BooleanValue value)
+        {
+            this.value = value;
+        }
+
+        @Override
+        public List<IConfigEntry> getChildren()
+        {
+            return List.of();
+        }
+
+        @Override
+        public boolean isRoot()
+        {
+            return false;
+        }
+
+        @Override
+        public boolean isLeaf()
+        {
+            return true;
+        }
+
+        @Override
+        public IConfigValue<?> getValue()
+        {
+            return this.value;
+        }
+
+        @Override
+        public String getEntryName()
+        {
+            return this.value.getName();
+        }
+
+        @Override
+        public Text getTooltip()
+        {
+            return this.value.getComment();
+        }
+
+        @Override
+        public String getTranslationKey()
+        {
+            return this.value.getTranslationKey();
+        }
+    }
+
+
+    public static class IntegerEntry implements IConfigEntry
+    {
+        private final IntegerValue value;
+
+        public IntegerEntry(IntegerValue value)
         {
             this.value = value;
         }
