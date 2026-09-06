@@ -11,6 +11,8 @@
   "better_removal.jade.preview": "Will extract: ",
   "config.better_removal.category.general": "General",
   "config.better_removal.jade_preview": "Jade Preview",
+  "config.better_removal.ftb_ultimine": "FTB Ultimine Chain Extraction",
+  "config.better_removal.ftb_ultimine_max_containers": "Chain Container Limit",
   "config.better_removal.category.vanilla": "Vanilla",
   "config.better_removal.category.farmersdelight": "Farmer's Delight",
   "config.better_removal.category.ad_astra": "Ad Astra",
