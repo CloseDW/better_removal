@@ -2,7 +2,7 @@ package closedw.br.jade;
 
 import closedw.br.ExtractionMode;
 import closedw.br.ExtractionModeManager;
-import closedw.br.ExtractionPreviewItems;
+import closedw.br.OutputSlotExtractor;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.resources.ResourceLocation;
@@ -37,7 +37,7 @@ public class BetterRemovalServerData implements IServerDataProvider<BlockAccesso
         }
 
         ExtractionMode mode = ExtractionModeManager.getMode(player);
-        List<ItemStack> items = ExtractionPreviewItems.collect(accessor.getBlockEntity(), mode);
+        List<ItemStack> items = OutputSlotExtractor.collectPreview(player, accessor.getBlockEntity(), mode);
         if (items == null || items.isEmpty()) {
             return;
         }

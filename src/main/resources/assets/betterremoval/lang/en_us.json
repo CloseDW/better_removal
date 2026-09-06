@@ -18,6 +18,8 @@
   "config.betterremoval.category.vinery": "Vinery",
   "config.betterremoval.category.fossil": "Fossils and Archeology: Revival",
   "config.betterremoval.jade_preview": "Jade Preview",
+  "config.betterremoval.ftb_ultimine": "FTB Ultimine Chain Extraction",
+  "config.betterremoval.ftb_ultimine_max_containers": "Chain Container Limit",
   "config.betterremoval.furnace": "Furnace",
   "config.betterremoval.blast_furnace": "Blast Furnace",
   "config.betterremoval.smoker": "Smoker",

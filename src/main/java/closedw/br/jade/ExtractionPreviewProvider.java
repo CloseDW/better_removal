@@ -86,7 +86,8 @@ public class ExtractionPreviewProvider implements IBlockComponentProvider {
 
         BoxStyle.GradientBorder style = BoxStyle.GradientBorder.DEFAULT_VIEW_GROUP.clone();
         style.bgColor = 0x2200AA00;
-        style.borderColor = new int[] { 0xFF55FF55 };
+        // 四条边（左/右/上/下）各需一个颜色，数组长度不足会在渲染时越界
+        style.borderColor = new int[] { 0xFF55FF55, 0xFF55FF55, 0xFF55FF55, 0xFF55FF55 };
         style.borderWidth = 1;
         tooltip.add(helper.box(inner, style));
     }

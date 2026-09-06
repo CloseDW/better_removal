@@ -15,6 +15,7 @@ import closedw.br.fossil.AnalyzerSupport;
 import closedw.br.fossil.CultureVatSupport;
 import closedw.br.fossil.SifterSupport;
 import closedw.br.fossil.WorktableSupport;
+import closedw.br.ftbultimine.FTBUltimineSupport;
 import closedw.br.vinery.ApplePressSupport;
 import closedw.br.vinery.FermentationBarrelSupport;
 import net.minecraft.core.BlockPos;
@@ -39,6 +40,10 @@ import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+
 /**
  * 潜行+空手右键容器可以直接取出物品（按当前取出模式）同时不用打开容器的 GUI。
  * 模式通过 /br 指令或按键切换（output/input/fuel/all）。
@@ -60,6 +65,25 @@ public final class OutputSlotExtractor {
         catch (LinkageError e) {
             return true;
         }
+    }
+
+    /**
+     * 查询整数配置。未安装Configured时返回fallback。
+     */
+    public static int getConfigInt(String key, int fallback) {
+        try {
+            return BetterRemovalConfig.get().getInt(key);
+        }
+        catch (LinkageError e) {
+            return fallback;
+        }
+    }
+
+    /**
+     * 修饰键是否按住：默认潜行；安装Carry On时为左Alt。
+     */
+    public static boolean isModifierHeld(Player player) {
+        return isCarryOnLoaded() ? CarryOnCompat.isAltKeyDown(player) : player.isShiftKeyDown();
     }
 
     /**
@@ -288,6 +312,116 @@ public final class OutputSlotExtractor {
         return null;
     }
 
+    /**
+     * FTB Ultimine连锁取出的容器位置列表。
+     * 条件：配置开启 + 按住Ultimine键 + Ultimine存在缓存的连锁形状。
+     * 点击的容器保证在列表中；数量受ftb_ultimine_max_containers限制。
+     * 返回null表示不适用连锁（回退到单容器取出）。
+     */
+    public static List<BlockPos> getChainPositions(Player player, BlockPos clicked) {
+        if (!isContainerEnabled("ftb_ultimine") || !FTBUltimineSupport.isKeyHeld(player)) {
+            return null;
+        }
+        Collection<BlockPos> shape = FTBUltimineSupport.getShapePositions(player);
+        if (shape == null || shape.isEmpty()) {
+            return null;
+        }
+        int max = getConfigInt("ftb_ultimine_max_containers", 64);
+        if (max <= 0) {
+            return null;
+        }
+        List<BlockPos> positions = new ArrayList<>();
+        if (!shape.contains(clicked)) {
+            positions.add(clicked);
+        }
+        for (BlockPos p : shape) {
+            if (positions.size() >= max) {
+                break;
+            }
+            positions.add(p);
+        }
+        return positions;
+    }
+
+    /**
+     * 连锁取出：遍历Ultimine连锁形状内的所有容器，逐个按当前模式取出。
+     * 不适用的容器（未支持/被关闭）自动跳过。
+     * @return 是否取出了任何物品
+     */
+    private static boolean handleChainExtraction(Player player, Level level, List<BlockPos> chain, ExtractionMode mode) {
+        boolean any = false;
+        for (BlockPos p : chain) {
+            BlockEntity be = level.getBlockEntity(p);
+            if (be == null) {
+                continue;
+            }
+            // 农夫乐事厨锅走反射路径
+            if (FarmersDelightSupport.isCookingPot(be)) {
+                if (!isContainerEnabled("cooking_pot")) {
+                    continue;
+                }
+                if (takeFromCookingPot(player, level, be, cookingPotSlots(mode))) {
+                    be.setChanged();
+                    any = true;
+                }
+                continue;
+            }
+            int[] slots = getSlotsForMode(be, mode);
+            if (slots == null || !(be instanceof Container container)) {
+                continue;
+            }
+            if (takeSlots(player, container, slots)) {
+                container.setChanged();
+                if (AdAstraMachineSupport.isAdAstraMachine(be)) {
+                    // Ad Astra机器在玩家取走物品后需要同步
+                    AdAstraMachineSupport.sync(be);
+                }
+                any = true;
+            }
+        }
+        if (!any) {
+            return false;
+        }
+        // 取物音效只播放一次，避免连锁时刷屏
+        finish(player, level, () -> {
+        });
+        return true;
+    }
+
+    /**
+     * Jade预览：计算将要取出的物品。
+     * 空手+按住修饰键+按住Ultimine键时聚合整个连锁形状内所有支持容器；否则单容器。
+     */
+    public static List<ItemStack> collectPreview(Player player, BlockEntity blockEntity, ExtractionMode mode) {
+        if (!player.getMainHandItem().isEmpty() || !player.getOffhandItem().isEmpty() || !isModifierHeld(player)) {
+            return ExtractionPreviewItems.collect(blockEntity, mode);
+        }
+        Level level = blockEntity.getLevel();
+        if (level == null) {
+            return ExtractionPreviewItems.collect(blockEntity, mode);
+        }
+        List<BlockPos> chain = getChainPositions(player, blockEntity.getBlockPos());
+        if (chain == null) {
+            return ExtractionPreviewItems.collect(blockEntity, mode);
+        }
+        List<ItemStack> items = new ArrayList<>();
+        for (BlockPos p : chain) {
+            BlockEntity be = level.getBlockEntity(p);
+            if (be == null) {
+                continue;
+            }
+            List<ItemStack> part = ExtractionPreviewItems.collect(be, mode);
+            if (part != null && !part.isEmpty()) {
+                items.addAll(part);
+            }
+            // 限制聚合大小，避免向客户端下发过大NBT
+            if (items.size() >= 128) {
+                break;
+            }
+        }
+        return items;
+    }
+
     @SubscribeEvent
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
         // 只在服务端执行逻辑
@@ -303,8 +437,8 @@ public final class OutputSlotExtractor {
         if (!player.getMainHandItem().isEmpty() || !player.getOffhandItem().isEmpty()) {
             return;
         }
-        // 仅潜行；同时安装Carry On时改用左Alt键（避免与Carry On的Shift+右键搬起冲突）
-        if (isCarryOnLoaded() ? !CarryOnCompat.isAltKeyDown(player) : !player.isShiftKeyDown()) {
+        // 修饰键：默认潜行；同时安装Carry On时改用左Alt键（避免与Carry On的Shift+右键搬起冲突）
+        if (!isModifierHeld(player)) {
             return;
         }
 
@@ -312,6 +446,17 @@ public final class OutputSlotExtractor {
         BlockPos pos = event.getPos();
         BlockEntity blockEntity = level.getBlockEntity(pos);
         ExtractionMode mode = ExtractionModeManager.getMode(player);
+
+        // ---------- FTB Ultimine连锁取出 ----------
+        // 修饰键+空手（上面已保证）再按住Ultimine键时，一次性取出整个连锁形状内所有支持容器的对应槽位
+        List<BlockPos> chain = getChainPositions(player, pos);
+        if (chain != null) {
+            if (handleChainExtraction(player, level, chain, mode)) {
+                event.setCanceled(true);
+                event.setCancellationResult(InteractionResult.SUCCESS);
+            }
+            return;
+        }
 
         // Farmer's Delight厨锅
         if (blockEntity != null && FarmersDelightSupport.isCookingPot(blockEntity)) {
@@ -350,20 +495,35 @@ public final class OutputSlotExtractor {
      * 通过反射访问getInventory()返回的ItemStackHandler。
      */
     private static boolean handleCookingPot(Player player, Level level, BlockEntity blockEntity, ExtractionMode mode) {
-        int[] slots;
-        if (mode == ExtractionMode.ALL) {
-            slots = new int[] { 0, 1, 2, 3, 4, 5, 6, 7, 8 };
+        if (!takeFromCookingPot(player, level, blockEntity, cookingPotSlots(mode))) {
+            return false;
         }
-        else if (mode == ExtractionMode.OUTPUT) {
-            slots = new int[] { 8 };
-        }
-        else if (mode == ExtractionMode.INPUT) {
-            slots = new int[] { 0, 1, 2, 3, 4, 5 };
-        }
-        else {
-            slots = new int[] { 7 };
-        }
+        finish(player, level, blockEntity::setChanged);
+        return true;
+    }
 
+    /**
+     * 厨锅在指定模式下的槽位。
+     */
+    private static int[] cookingPotSlots(ExtractionMode mode) {
+        if (mode == ExtractionMode.ALL) {
+            return new int[] { 0, 1, 2, 3, 4, 5, 6, 7, 8 };
+        }
+        if (mode == ExtractionMode.OUTPUT) {
+            return new int[] { 8 };
+        }
+        if (mode == ExtractionMode.INPUT) {
+            return new int[] { 0, 1, 2, 3, 4, 5 };
+        }
+        // 燃料模式：容器槽
+        return new int[] { 7 };
+    }
+
+    /**
+     * 从厨锅指定槽位取出物品到玩家背包（反射读写，逐槽处理）。
+     * @return 是否取出了物品
+     */
+    private static boolean takeFromCookingPot(Player player, Level level, BlockEntity blockEntity, int[] slots) {
         boolean takenAny = false;
         for (int slot : slots) {
             ItemStack output = FarmersDelightSupport.getSlot(level, blockEntity.getBlockPos(), blockEntity, slot);
@@ -377,12 +537,7 @@ public final class OutputSlotExtractor {
             FarmersDelightSupport.removeFromSlot(level, blockEntity.getBlockPos(), blockEntity, slot, placed);
             takenAny = true;
         }
-
-        if (!takenAny) {
-            return false;
-        }
-        finish(player, level, blockEntity::setChanged);
-        return true;
+        return takenAny;
     }
 
     /**
@@ -396,8 +551,24 @@ public final class OutputSlotExtractor {
     }
 
     private static boolean takeFromContainer(Player player, Level level, Container container, int[] slots) {
+        if (!takeSlots(player, container, slots)) {
+            return false;
+        }
+        finish(player, level, container::setChanged);
+        return true;
+    }
+
+    /**
+     * 从指定槽位取出物品到玩家背包。
+     * @return 是否取出了物品
+     */
+    private static boolean takeSlots(Player player, Container container, int[] slots) {
         boolean takenAny = false;
         for (int slot : slots) {
+            // 越界保护：模组更新可能改变槽位布局，getItem越界抛出的异常会把玩家踢出服务器
+            if (slot < 0 || slot >= container.getContainerSize()) {
+                continue;
+            }
             ItemStack result = container.getItem(slot);
             if (result.isEmpty()) {
                 continue;
@@ -414,13 +585,7 @@ public final class OutputSlotExtractor {
             }
             takenAny = true;
         }
-
-        if (!takenAny) {
-            return false;
-        }
-
-        finish(player, level, container::setChanged);
-        return true;
+        return takenAny;
     }
 
     /**
