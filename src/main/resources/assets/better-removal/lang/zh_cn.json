@@ -11,6 +11,8 @@
   "better-removal.jade.preview": "即将取出: ",
   "config.better-removal.category.general": "通用",
   "config.better-removal.jade_preview": "Jade 预览",
+  "config.better-removal.ftb_ultimine": "FTB Ultimine 连锁取出",
+  "config.better-removal.ftb_ultimine_max_containers": "连锁容器上限",
   "config.better-removal.category.vanilla": "原版",
   "config.better-removal.category.farmersdelight": "农夫乐事",
   "config.better-removal.category.ad_astra": "Ad Astra",

@@ -56,6 +56,10 @@ public final class ExtractionPreviewItems {
 
 		List<ItemStack> items = new ArrayList<>();
 		for (int slot : slots) {
+			// 越界保护：模组更新可能改变槽位布局，getStack越界会抛异常
+			if (slot < 0 || slot >= inventory.size()) {
+				continue;
+			}
 			ItemStack stack = inventory.getStack(slot);
 			if (!stack.isEmpty()) {
 				items.add(stack);

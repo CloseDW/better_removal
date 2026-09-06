@@ -3,7 +3,7 @@ package common.jade;
 import common.BetterRemoval;
 import common.ExtractionMode;
 import common.ExtractionModeManager;
-import common.ExtractionPreviewItems;
+import common.OutputSlotExtractor;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
@@ -40,7 +40,7 @@ public class BetterRemovalServerData implements IServerDataProvider<BlockAccesso
 		}
 
 		ExtractionMode mode = ExtractionModeManager.getMode(player);
-		List<ItemStack> items = ExtractionPreviewItems.collect(blockEntity, mode);
+		List<ItemStack> items = OutputSlotExtractor.collectPreview(player, blockEntity, mode);
 		if (items == null || items.isEmpty()) {
 			return;
 		}
