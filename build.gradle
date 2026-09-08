@@ -17,6 +17,13 @@ loom {
 			sourceSet sourceSets.main
 		}
 	}
+
+	// 注册 mixin 配置。loom 1.17 默认关闭 Mixin 注解处理器（新管线的原地重映射存在缺口，
+	// 正式环境无法解析 Yarn 方法名导致启动崩溃），此处重新启用旧版 AP 以生成 refmap。
+	mixin {
+		useLegacyMixinAp = true
+		add(sourceSets.main, "better-removal.refmap.json")
+	}
 }
 
 dependencies {
@@ -65,6 +72,10 @@ java {
 }
 
 jar {
+	// Mixin AP 会把补写 refmap 后的 mixins.json 输出到 classes 目录，与 resources 目录的原件重复
+	// EXCLUDE 保留先遍历到的（classes 目录里 AP 处理过的版本）
+	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
 	def projectName = project.name
 	inputs.property "projectName", projectName
 

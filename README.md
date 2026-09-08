@@ -1,100 +1,81 @@
 # Better Removal
 
-Fabric 1.20.1: **Sneak + empty-hand right-click** a container to directly extract its items into your inventory — **without opening the GUI**.
+Fabric 1.20.1: Hold **Left Alt** (rebindable) and **right-click** a container to directly extract its items into your inventory — **without opening the GUI**.
 
-## Extraction Modes
+## Modes
 
-By default only the **output** slots are extracted. You can switch the extraction mode with the `/br` command or a keybinding:
+Hold **Left Alt** (rebindable) and right-click:
 
-| Mode | Command | Extracts |
+- **Empty hands** to **extract** (or **restock** from your inventory);
+- **Holding an item** to **deposit** that item into supported containers.
+
+Pick a preset with the **Mode** keybinding (hold it, scroll to move through the 7 presets, release to apply) or the `/br` command:
+
+| Preset | Command | Effect |
 |---|---|---|
-| Output (default) | `/br output` | Output slots only |
-| Input | `/br input` | Input slots only |
-| Fuel | `/br fuel` | Fuel slots only |
-| All | `/br all` | Every slot |
+| Extract · Output (default) | `/br extract output` | Extracts output slots only |
+| Extract · Input | `/br extract input` | Extracts input slots only |
+| Extract · Fuel | `/br extract fuel` | Extracts fuel slots only |
+| Extract · All | `/br extract all` | Extracts every slot |
+| Deposit · Input | `/br deposit input` | Deposits into input slots |
+| Deposit · Fuel | `/br deposit fuel` | Deposits into fuel slots |
+| Restock | `/br restock` | Refills input/fuel slots with matching items from your inventory (empty slots are skipped) |
 
-- `/br now` — shows your current extraction mode.
-- A **keybinding** (unbound by default) cycles through the modes: `Output → Input → Fuel → All → Output ...`
+- `/br now` — shows your current preset.
+- `/br` (no arguments) — same as `/br now`.
+- Container slot filters are respected when depositing (e.g. a furnace's fuel slot only accepts fuel).
 
 ## Supported Containers
 
-### Vanilla
+### Extraction & Deposit
+
+| Container | Extract | Deposit (Input / Fuel) |
+|---|---|---|
+| Furnace / Blast Furnace / Smoker | yes | input slot / fuel slot |
+| Brewing Stand | yes | ingredient / blaze powder |
+| Hopper / Dispenser / Dropper | yes | every slot |
+| Farmer's Delight Basket | yes | every slot |
+| Ad Astra Compressor | yes | input |
+| Ad Astra Etrionic Blast Furnace | yes | inputs |
+| Ad Astra Fuel Refinery | yes | fluid + item inputs |
+| Ad Astra Oxygen Loader | yes | fluid + item inputs |
+| Ad Astra Cryo Freezer | yes | inputs |
+| Crabber's Delight Crab Trap | yes | bait slot |
+| The Aether Freezer / Altar | yes | input / fuel |
+| Vinery Fermentation Barrel | yes | inputs / wine bottle |
+| Vinery Apple Press | yes | inputs / wine bottle |
+| Fossils and Archeology Analyzer | yes | inputs |
+| Fossils and Archeology Sifter | yes | input |
+| Fossils and Archeology Culture Vat | yes | input / fuel |
+| Fossils and Archeology Worktable | yes | input / fuel |
+
+### Extraction only
 
 | Container |
 |---|
-| Furnace / Blast Furnace / Smoker |
-| Brewing Stand |
-| Hopper / Dispenser / Dropper |
-
-### Farmer's Delight
-
-| Container |
-|---|
-| Cooking Pot |
-| Wooden / Bamboo Basket |
-
-### Ad Astra
-
-| Container |
-|---|
-| Compressor |
-| Etrionic Blast Furnace |
-| Fuel Refinery |
-| Oxygen Loader |
-| Cryo Freezer |
-
-### Crabber's Delight
-
-| Container |
-|---|
-| Crab Trap |
-
-### The Aether
-
-| Container |
-|---|
-| Freezer |
-| Altar |
-
-### Vinery
-
-| Container |
-|---|
-| Fermentation Barrel |
-| Apple Press |
-
-### Fossils and Archeology: Revival
-
-| Container |
-|---|
-| Analyzer |
-| Sifter |
-| Culture Vat |
-| Archeology Workbench |
+| Farmer's Delight Cooking Pot |
 
 ---
 
 ## Configuration
 
-Edit via the **Configured** mod.
+Edit via the **Configured** mod (Jade preview, FTB Ultimine chain extraction, Deposit mode, Restock mode, per-container toggles).
 
 ---
 
 ## Compatibility
 
-When this mod is installed together with **Carry On**, its activation is changed to **Left Alt + empty-hand right-click**.
-
 ### FTB Ultimine
 
-With **FTB Ultimine** installed, holding **both** modifier keys — the Better Removal modifier (Sneak, or Left Alt with Carry On) **and** the Ultimine key (default `~`) — while right-clicking a supported container with empty hands extracts the items from **every supported container in the current Ultimine shape** , according to the current extraction mode. 
+With **FTB Ultimine** installed, holding **both** keys — the Better Removal modifier (Left Alt, rebindable) **and** the Ultimine key (default `~`) — while right-clicking a supported container extracts from (empty hands) or deposits into (holding an item) **every supported container in the current Ultimine shape**.
 
 > Note: FTB Ultimine must be installed on both the client and the server, since the key state and the chain shape are managed server-side.
 
 ### Jade
 
-With **Jade** installed, holding the modifier key (Sneak, or Left Alt with Carry On) while looking at a supported container with empty hands shows a highlighted "Will extract:" line in the tooltip, previewing the items that would be extracted for the current mode. When an FTB Ultimine chain extraction would trigger (both keys held), the preview shows the combined items of all chained containers. This can be toggled via the **Jade Preview** option in the Configured config.
+With **Jade** installed, holding the modifier key while looking at a supported container shows a highlighted preview in the tooltip — the items that would be extracted (empty hands) or the item that would be deposited (holding an item in deposit mode). When an FTB Ultimine chain extraction would trigger, the preview shows the combined items of all chained containers. This can be toggled via the **Jade Preview** option in the Configured config.
 
-> Note: For the preview to show real container contents, **Jade must be installed on both the client and the server**. 
+> Note: For the extraction preview to show real container contents, **Jade must be installed on both the client and the server**.
 
 ---
 
