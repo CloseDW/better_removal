@@ -9,7 +9,7 @@ Hold **Left Alt** (rebindable) and right-click:
 - **Empty hands** to **extract** (or **restock** from your inventory);
 - **Holding an item** to **deposit** that item into supported containers.
 
-Pick a preset with the **Mode** keybinding (hold it, scroll to move through the 7 presets, release to apply) or the `/br` command:
+Pick a preset with the **Mode** keybinding (hold it, scroll to move through the 7 presets, release to apply; **unbound by default**) or the `/br` command:
 
 | Preset | Command | Effect |
 |---|---|---|
@@ -35,6 +35,7 @@ Pick a preset with the **Mode** keybinding (hold it, scroll to move through the 
 | Brewing Stand | yes | ingredient / blaze powder |
 | Hopper / Dispenser / Dropper | yes | every slot |
 | Farmer's Delight Basket | yes | every slot |
+| Farmer's Delight Cooking Pot | yes | input|
 | Ad Astra Compressor | yes | input |
 | Ad Astra Etrionic Blast Furnace | yes | inputs |
 | Ad Astra Fuel Refinery | yes | fluid + item inputs |
@@ -49,26 +50,18 @@ Pick a preset with the **Mode** keybinding (hold it, scroll to move through the 
 | Fossils and Archeology Culture Vat | yes | input / fuel |
 | Fossils and Archeology Worktable | yes | input / fuel |
 
-### Extraction only
-
-| Container |
-|---|
-| Farmer's Delight Cooking Pot |
-
 ---
 
 ## Configuration
 
-Edit via the **Configured** mod (Jade preview, FTB Ultimine chain extraction, Deposit mode, Restock mode, per-container toggles).
-
+Edit via the **Configured** mod
 ---
 
 ## Compatibility
 
 ### FTB Ultimine
 
-With **FTB Ultimine** installed, holding **both** keys — the Better Removal modifier (Left Alt, rebindable) **and** the Ultimine key (default `~`) — while right-clicking a supported container extracts from (empty hands) or deposits into (holding an item) **every supported container in the current Ultimine shape**.
-
+With **FTB Ultimine** installed, holding **both** keys — the Better Removal modifier (Left Alt, rebindable) **and** the Ultimine key (default `~`) — while right-clicking a supported container operates on **every supported container in the current Ultimine shape**.
 > Note: FTB Ultimine must be installed on both the client and the server, since the key state and the chain shape are managed server-side.
 
 ### Jade
