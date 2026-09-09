@@ -26,6 +26,7 @@
   "config.better-removal.category.aether": "The Aether",
   "config.better-removal.category.vinery": "Vinery",
   "config.better-removal.category.fossil": "Fossils and Archeology: Revival",
+  "config.better-removal.category.cookingforblockheads": "Cooking for Blockheads",
   "config.better-removal.furnace": "Furnace",
   "config.better-removal.blast_furnace": "Blast Furnace",
   "config.better-removal.smoker": "Smoker",
@@ -48,5 +49,6 @@
   "config.better-removal.analyzer": "Analyzer",
   "config.better-removal.sifter": "Sifter",
   "config.better-removal.culture_vat": "Culture Vat",
-  "config.better-removal.worktable": "Archeology Workbench"
+  "config.better-removal.worktable": "Archeology Workbench",
+  "config.better-removal.oven": "Oven"
 }

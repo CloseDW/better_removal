@@ -68,6 +68,8 @@ public class BetterRemovalConfig implements IModConfig
 
         CATEGORIES.put("fossil", List.of("analyzer", "sifter", "culture_vat", "worktable"));
 
+        CATEGORIES.put("cookingforblockheads", List.of("oven"));
+
         DEFAULT_VALUES.put("jade_preview", true);
         DEFAULT_VALUES.put("ftb_ultimine", true);
         DEFAULT_VALUES.put("deposit", true);
@@ -95,6 +97,7 @@ public class BetterRemovalConfig implements IModConfig
         DEFAULT_VALUES.put("sifter", true);
         DEFAULT_VALUES.put("culture_vat", true);
         DEFAULT_VALUES.put("worktable", true);
+        DEFAULT_VALUES.put("oven", true);
 
         // FTB Ultimine连锁取出单次最多容器数量（64）
         INT_DEFAULTS.put("ftb_ultimine_max_containers", 64);

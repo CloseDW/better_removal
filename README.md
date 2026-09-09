@@ -35,7 +35,8 @@ Pick a preset with the **Mode** keybinding (hold it, scroll to move through the 
 | Brewing Stand | yes | ingredient / blaze powder |
 | Hopper / Dispenser / Dropper | yes | every slot |
 | Farmer's Delight Basket | yes | every slot |
-| Farmer's Delight Cooking Pot | yes | input|
+| Farmer's Delight Cooking Pot | yes | input |
+| Cooking for Blockheads Oven | yes | input / fuel |
 | Ad Astra Compressor | yes | input |
 | Ad Astra Etrionic Blast Furnace | yes | inputs |
 | Ad Astra Fuel Refinery | yes | fluid + item inputs |

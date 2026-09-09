@@ -26,6 +26,7 @@
   "config.better-removal.category.aether": "天境",
   "config.better-removal.category.vinery": "葡园酒香",
   "config.better-removal.category.fossil": "考古与化石",
+  "config.better-removal.category.cookingforblockheads": "烹饪与方块头",
   "config.better-removal.furnace": "熔炉",
   "config.better-removal.blast_furnace": "高炉",
   "config.better-removal.smoker": "烟熏炉",
@@ -48,5 +49,6 @@
   "config.better-removal.analyzer": "分析仪",
   "config.better-removal.sifter": "筛子",
   "config.better-removal.culture_vat": "培养槽",
-  "config.better-removal.worktable": "考古工作台"
+  "config.better-removal.worktable": "考古工作台",
+  "config.better-removal.oven": "烤炉"
 }

@@ -1,5 +1,6 @@
 package closedw.br;
 
+import closedw.br.cookingforblockheads.CookingForBlockheadsSupport;
 import closedw.br.farmersdelight.FarmersDelightSupport;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.inventory.Inventory;
@@ -40,6 +41,30 @@ public final class ExtractionPreviewItems {
 			for (int slot : slots) {
 				ItemStack stack = FarmersDelightSupport.getSlot(null, blockEntity.getPos(), blockEntity, slot);
 				if (stack != null && !stack.isEmpty()) {
+					items.add(stack);
+				}
+			}
+			return items;
+		}
+
+		// 烤炉：反射拿内部容器（不是Inventory）
+		if (CookingForBlockheadsSupport.isOven(blockEntity)) {
+			if (!OutputSlotExtractor.isContainerEnabled("oven") || CookingForBlockheadsSupport.isAutomationDisallowed()) {
+				return null;
+			}
+			int[] slots = OutputSlotExtractor.getSlotsForMode(blockEntity, mode);
+			Inventory ovenInventory = CookingForBlockheadsSupport.getInternalInventory(blockEntity);
+			if (slots == null || ovenInventory == null) {
+				return null;
+			}
+			List<ItemStack> items = new ArrayList<>();
+			for (int slot : slots) {
+				// 越界保护：getStack越界会抛异常
+				if (slot < 0 || slot >= ovenInventory.size()) {
+					continue;
+				}
+				ItemStack stack = ovenInventory.getStack(slot);
+				if (!stack.isEmpty()) {
 					items.add(stack);
 				}
 			}

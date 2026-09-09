@@ -9,6 +9,7 @@ import closedw.br.adastra.OxygenLoaderSupport;
 import closedw.br.aether.AltarSupport;
 import closedw.br.aether.FreezerSupport;
 import closedw.br.config.BetterRemovalConfig;
+import closedw.br.cookingforblockheads.CookingForBlockheadsSupport;
 import closedw.br.crabbersdelight.CrabTrapSupport;
 import closedw.br.ftbultimine.FTBUltimineSupport;
 import closedw.br.farmersdelight.FarmersDelightSupport;
@@ -42,6 +43,7 @@ import net.minecraft.world.World;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -98,6 +100,14 @@ public final class OutputSlotExtractor {
 	 * 公有：服务端取物与 Jade 客户端预览共用。
 	 */
 	public static int[] getSlotsForMode(BlockEntity blockEntity, ExtractionMode mode) {
+		// ---------- Cooking for Blockheads ----------
+		// 烤炉不是Inventory（反射拿内部20格容器），且ALL模式需要在通用ALL拦截之前处理
+		if (CookingForBlockheadsSupport.isOven(blockEntity)
+				&& isContainerEnabled("oven")
+				&& !CookingForBlockheadsSupport.isAutomationDisallowed()) {
+			return ovenSlots(mode);
+		}
+
 		if (mode == ExtractionMode.ALL) {
 			// ALL受容器开关约束，不允许绕过配置
 			String key = getConfigKey(blockEntity);
@@ -304,6 +314,10 @@ public final class OutputSlotExtractor {
 		if (WorktableSupport.isWorktable(blockEntity)) {
 			return "worktable";
 		}
+		// ---------- Cooking for Blockheads ----------
+		if (CookingForBlockheadsSupport.isOven(blockEntity)) {
+			return "oven";
+		}
 		return null;
 	}
 
@@ -368,6 +382,18 @@ public final class OutputSlotExtractor {
 				}
 				if (takeFromCookingPot(player, world, be, cookingPotSlots(mode))) {
 					be.markDirty();
+					any = true;
+				}
+				continue;
+			}
+			// 烤炉走反射路径拿内部容器（不是Inventory）
+			if (CookingForBlockheadsSupport.isOven(be)) {
+				if (!isContainerEnabled("oven") || CookingForBlockheadsSupport.isAutomationDisallowed()) {
+					continue;
+				}
+				Inventory ovenInventory = CookingForBlockheadsSupport.getInternalInventory(be);
+				if (ovenInventory != null && takeSlots(player, ovenInventory, ovenSlots(mode))) {
+					ovenInventory.markDirty();
 					any = true;
 				}
 				continue;
@@ -510,6 +536,25 @@ public final class OutputSlotExtractor {
 			});
 			return ActionResult.SUCCESS;
 		}
+		// 烤炉走反射路径拿内部容器（不是Inventory），isValid过滤
+		if (CookingForBlockheadsSupport.isOven(blockEntity)) {
+			if (!isContainerEnabled("oven") || CookingForBlockheadsSupport.isAutomationDisallowed()) {
+				return ActionResult.PASS;
+			}
+			int[] ovenDepositSlots = getDepositSlots(blockEntity, state.mode());
+			Inventory ovenInventory = CookingForBlockheadsSupport.getInternalInventory(blockEntity);
+			if (ovenDepositSlots == null || ovenInventory == null) {
+				return ActionResult.PASS;
+			}
+			if (!depositToInventory(player, world, ovenInventory, ovenDepositSlots, held, Integer.MAX_VALUE)) {
+				return ActionResult.PASS;
+			}
+			finish(player, world, () -> {
+				ovenInventory.markDirty();
+				player.getInventory().markDirty();
+			});
+			return ActionResult.SUCCESS;
+		}
 		int[] slots = getDepositSlots(blockEntity, state.mode());
 		if (slots == null || !(blockEntity instanceof Inventory inventory)) {
 			return ActionResult.PASS;
@@ -543,6 +588,18 @@ public final class OutputSlotExtractor {
 			return handleCookingPot(player, world, blockEntity, mode);
 		}
 
+		// 烤炉走反射路径拿内部容器（不是Inventory）
+		if (CookingForBlockheadsSupport.isOven(blockEntity)) {
+			if (!isContainerEnabled("oven") || CookingForBlockheadsSupport.isAutomationDisallowed()) {
+				return ActionResult.PASS;
+			}
+			Inventory ovenInventory = CookingForBlockheadsSupport.getInternalInventory(blockEntity);
+			if (ovenInventory == null) {
+				return ActionResult.PASS;
+			}
+			return takeFromInventory(player, world, ovenInventory, ovenSlots(mode));
+		}
+
 		int[] slots = getSlotsForMode(blockEntity, mode);
 		if (slots == null || !(blockEntity instanceof Inventory inventory)) {
 			return ActionResult.PASS;
@@ -568,7 +625,7 @@ public final class OutputSlotExtractor {
 
 	/**
 	 * 把主手物品放入容器的指定槽位（同类堆叠优先合并，空槽其次）。
-	 * 每个槽位都会先经过 Inventory.isValid 校验（如熔炉燃料槽只收燃料）。
+	 * 每个槽位都会先经过 Inventory.isValid 校验。
 	 * @param maxTake 本次最多放入的数量（连锁均分时限制单容器份额）
 	 * @return 是否放入了至少一个物品
 	 */
@@ -579,33 +636,9 @@ public final class OutputSlotExtractor {
 			if (held.isEmpty() || taken >= maxTake) {
 				break;
 			}
-			// 越界保护：模组更新可能改变槽位布局
-			if (slot < 0 || slot >= inventory.size()) {
-				continue;
-			}
-			ItemStack existing = inventory.getStack(slot);
-			if (existing.isEmpty()) {
-				// 空槽：容器校验通过后放入
-				if (!inventory.isValid(slot, held)) {
-					continue;
-				}
-				int put = Math.min(Math.min(held.getCount(), held.getMaxCount()), maxTake - taken);
-				ItemStack copy = held.copy();
-				copy.setCount(put);
-				inventory.setStack(slot, copy);
-				held.decrement(put);
+			int put = depositToInventorySlot(player, inventory, slot, held, maxTake - taken);
+			if (put > 0) {
 				taken += put;
-				movedAny = true;
-			}
-			else if (isSameItem(existing, held)) {
-				// 同类堆叠：合并到槽位上限
-				int canMove = Math.min(Math.min(held.getCount(), existing.getMaxCount() - existing.getCount()), maxTake - taken);
-				if (canMove <= 0) {
-					continue;
-				}
-				existing.increment(canMove);
-				held.decrement(canMove);
-				taken += canMove;
 				movedAny = true;
 			}
 		}
@@ -613,19 +646,15 @@ public final class OutputSlotExtractor {
 	}
 
 	/**
-	 * 连锁放入：把主手物品均匀分摊到Ultimine连锁形状内的所有可接收容器。
-	 * 槽位放不下时余量自动流向后面的容器。
-	 * 一个容器放不满不阻塞其它容器；手持物品耗尽即止。
+	 * 连锁放入：把主手物品按权重分摊到Ultimine连锁形状内的所有可接收槽位。
+	 * 权重=槽位剩余容量（空槽按整组计、同类槽按剩余空间计）
+	 * 放不下的余量留在手上
 	 */
 	private static ActionResult handleChainDeposit(PlayerEntity player, World world, List<BlockPos> chain, ExtractionMode slotMode, ItemStack held) {
-		// 第一遍：筛出当前能接收手持物品的容器
-		record Target(BlockEntity be, Inventory inv, int[] slots, boolean cookingPot) {
-		}
-		List<Target> targets = new ArrayList<>();
+		// 第一遍：收集所有能接收手持物品的槽位及其权重
+		List<DepositSlot> slots = new ArrayList<>();
+		Set<BlockEntity> dirty = new HashSet<>();
 		for (BlockPos pos : chain) {
-			if (held.isEmpty()) {
-				break;
-			}
 			BlockEntity be = world.getBlockEntity(pos);
 			if (be == null) {
 				continue;
@@ -636,57 +665,197 @@ public final class OutputSlotExtractor {
 					continue;
 				}
 				int[] potSlots = cookingPotDepositSlots(slotMode);
-				if (potSlots != null && canAcceptCookingPot(world, be, potSlots, held)) {
-					targets.add(new Target(be, null, potSlots, true));
+				if (potSlots == null) {
+					continue;
+				}
+				for (int slot : potSlots) {
+					int weight = cookingPotSlotFree(world, be, slot, held);
+					if (weight > 0) {
+						slots.add(new DepositSlot(be, null, slot, true, weight));
+						dirty.add(be);
+					}
 				}
 				continue;
 			}
-			int[] slots = getDepositSlots(be, slotMode);
-			if (slots == null || !(be instanceof Inventory inventory)) {
+			// 烤炉走反射路径拿内部容器（不是Inventory）
+			if (CookingForBlockheadsSupport.isOven(be)) {
+				if (!isContainerEnabled("oven") || CookingForBlockheadsSupport.isAutomationDisallowed()) {
+					continue;
+				}
+				Inventory ovenInventory = CookingForBlockheadsSupport.getInternalInventory(be);
+				int[] ovenDepositSlots = getDepositSlots(be, slotMode);
+				if (ovenInventory == null || ovenDepositSlots == null) {
+					continue;
+				}
+				for (int slot : ovenDepositSlots) {
+					int weight = slotFreeCapacity(ovenInventory, slot, held);
+					if (weight > 0) {
+						slots.add(new DepositSlot(be, ovenInventory, slot, false, weight));
+						dirty.add(be);
+					}
+				}
 				continue;
 			}
-			if (canAcceptAny(inventory, slots, held)) {
-				targets.add(new Target(be, inventory, slots, false));
+			int[] depositSlots = getDepositSlots(be, slotMode);
+			if (depositSlots == null || !(be instanceof Inventory inventory)) {
+				continue;
+			}
+			for (int slot : depositSlots) {
+				int weight = slotFreeCapacity(inventory, slot, held);
+				if (weight > 0) {
+					slots.add(new DepositSlot(be, inventory, slot, false, weight));
+					dirty.add(be);
+				}
 			}
 		}
-		if (targets.isEmpty()) {
+		if (slots.isEmpty()) {
 			return ActionResult.PASS;
 		}
 
-		// 第二遍：均分放入
-		int containersLeft = targets.size();
+		// 按权重比例分配手持物品（权重=槽位剩余容量）
+		long totalWeight = 0;
+		for (DepositSlot s : slots) {
+			totalWeight += s.weight();
+		}
+		int remaining = held.getCount();
+		int[] share = new int[slots.size()];
+		long allocated = 0;
+		for (int i = 0; i < slots.size(); i++) {
+			share[i] = (int) ((long) remaining * slots.get(i).weight() / totalWeight);
+			allocated += share[i];
+		}
+		// 余数补足给权重最大且未填满的槽位
+		int leftover = remaining - (int) allocated;
+		while (leftover > 0) {
+			int best = -1;
+			for (int i = 0; i < slots.size(); i++) {
+				if (share[i] < slots.get(i).weight() && (best == -1 || slots.get(i).weight() > slots.get(best).weight())) {
+					best = i;
+				}
+			}
+			if (best == -1) {
+				break;
+			}
+			share[best]++;
+			leftover--;
+		}
+
+		// 第二遍：按份额放入，实际放入少于份额的余量留在手上
 		boolean any = false;
-		for (Target target : targets) {
+		for (int i = 0; i < slots.size(); i++) {
 			if (held.isEmpty()) {
 				break;
 			}
-			int share = Math.max(1, held.getCount() / containersLeft);
-			boolean moved = target.cookingPot()
-					? depositToCookingPot(player, world, target.be(), target.slots(), held, share)
-					: depositToInventory(player, world, target.inv(), target.slots(), held, share);
-			if (moved) {
-				if (target.cookingPot()) {
-					target.be().markDirty();
-				}
-				else {
-					target.inv().markDirty();
-					if (AdAstraMachineSupport.isAdAstraMachine(target.be())) {
-						// Ad Astra机器在物品变化后需要同步
-						AdAstraMachineSupport.sync(target.be());
-					}
-				}
+			if (share[i] <= 0) {
+				continue;
+			}
+			DepositSlot s = slots.get(i);
+			int actual = s.pot()
+					? depositToCookingPotSlot(player, world, s.be(), s.slot(), held, share[i])
+					: depositToInventorySlot(player, s.inv(), s.slot(), held, share[i]);
+			if (actual > 0) {
 				any = true;
 			}
-			containersLeft--;
 		}
 		if (!any) {
 			return ActionResult.PASS;
+		}
+		for (BlockEntity be : dirty) {
+			be.markDirty();
+			if (AdAstraMachineSupport.isAdAstraMachine(be)) {
+				// Ad Astra机器在物品变化后需要同步
+				AdAstraMachineSupport.sync(be);
+			}
 		}
 		player.getInventory().markDirty();
 		// 放入音效只播放一次，避免连锁时刷屏
 		finish(player, world, () -> {
 		});
 		return ActionResult.SUCCESS;
+	}
+
+	/** 连锁放入的可接收槽位（权重=槽位剩余容量） */
+	private record DepositSlot(BlockEntity be, Inventory inv, int slot, boolean pot, int weight) {
+	}
+
+	/** 槽位剩余可放容量（权重）。空槽=手持堆叠上限；同类=剩余空间；其它=0 */
+	private static int slotFreeCapacity(Inventory inv, int slot, ItemStack held) {
+		if (slot < 0 || slot >= inv.size()) {
+			return 0;
+		}
+		ItemStack existing = inv.getStack(slot);
+		if (existing.isEmpty()) {
+			return inv.isValid(slot, held) ? held.getMaxCount() : 0;
+		}
+		if (isSameItem(existing, held)) {
+			return Math.max(0, existing.getMaxCount() - existing.getCount());
+		}
+		return 0;
+	}
+
+	/** 厨锅槽位剩余可放容量（反射simulate，按手持物品堆叠上限测真实空间） */
+	private static int cookingPotSlotFree(World world, BlockEntity be, int slot, ItemStack held) {
+		ItemStack probe = held.copy();
+		probe.setCount(held.getMaxCount());
+		return FarmersDelightSupport.insertToSlot(world, be.getPos(), be, slot, probe, true);
+	}
+
+	/** 放入单个Inventory槽位（空槽/同类合并），返回实际放入数量 */
+	private static int depositToInventorySlot(PlayerEntity player, Inventory inv, int slot, ItemStack held, int maxTake) {
+		if (slot < 0 || slot >= inv.size() || held.isEmpty() || maxTake <= 0) {
+			return 0;
+		}
+		ItemStack existing = inv.getStack(slot);
+		if (existing.isEmpty()) {
+			if (!inv.isValid(slot, held)) {
+				return 0;
+			}
+			int put = Math.min(Math.min(held.getCount(), held.getMaxCount()), maxTake);
+			if (put <= 0) {
+				return 0;
+			}
+			ItemStack copy = held.copy();
+			copy.setCount(put);
+			inv.setStack(slot, copy);
+			held.decrement(put);
+			return put;
+		}
+		if (isSameItem(existing, held)) {
+			int canMove = Math.min(Math.min(held.getCount(), existing.getMaxCount() - existing.getCount()), maxTake);
+			if (canMove <= 0) {
+				return 0;
+			}
+			existing.increment(canMove);
+			// 显式写回：部分模组容器的 getStack 返回副本，直接 increment 不会生效
+			inv.setStack(slot, existing);
+			held.decrement(canMove);
+			return canMove;
+		}
+		return 0;
+	}
+
+	/** 放入单个厨锅槽位（反射），返回实际放入数量 */
+	private static int depositToCookingPotSlot(PlayerEntity player, World world, BlockEntity be, int slot, ItemStack held, int maxTake) {
+		if (held.isEmpty() || maxTake <= 0) {
+			return 0;
+		}
+		ItemStack portion = held.copy();
+		portion.setCount(Math.min(held.getCount(), maxTake));
+		int put = FarmersDelightSupport.insertToSlot(world, be.getPos(), be, slot, portion, false);
+		if (put > 0) {
+			held.decrement(put);
+		}
+		return put;
+	}
+
+	/** 把放不进的物品退还到玩家背包主背包（这些物品刚从中取出，一定有空间） */
+	private static void giveBackToPlayer(PlayerEntity player, int count, ItemStack template) {
+		if (count <= 0 || template == null || template.isEmpty()) {
+			return;
+		}
+		ItemStack refund = template.copy();
+		refund.setCount(count);
+		player.getInventory().offer(refund, false);
 	}
 
 	/**
@@ -711,18 +880,6 @@ public final class OutputSlotExtractor {
 	}
 
 	/**
-	 * 判断厨锅指定槽位中是否有至少一个能接收手持物品。
-	 */
-	private static boolean canAcceptCookingPot(World world, BlockEntity blockEntity, int[] slots, ItemStack held) {
-		for (int slot : slots) {
-			if (FarmersDelightSupport.insertToSlot(world, blockEntity.getPos(), blockEntity, slot, held, true) > 0) {
-				return true;
-			}
-		}
-		return false;
-	}
-
-	/**
 	 * 把手持物品放入厨锅的指定槽位（反射insertItem，自动同类堆叠合并）。
 	 * @param maxTake 本次最多放入的数量（连锁均分时限制单容器份额）
 	 * @return 是否放入了至少一个物品
@@ -734,12 +891,8 @@ public final class OutputSlotExtractor {
 			if (held.isEmpty() || taken >= maxTake) {
 				break;
 			}
-			// 传入副本：ItemStackHandler空槽插入会直接持有传入的堆叠实例
-			ItemStack portion = held.copy();
-			portion.setCount(Math.min(held.getCount(), maxTake - taken));
-			int put = FarmersDelightSupport.insertToSlot(world, blockEntity.getPos(), blockEntity, slot, portion, false);
+			int put = depositToCookingPotSlot(player, world, blockEntity, slot, held, maxTake - taken);
 			if (put > 0) {
-				held.decrement(put);
 				taken += put;
 				movedAny = true;
 			}
@@ -780,6 +933,18 @@ public final class OutputSlotExtractor {
 				}
 			}
 			return false;
+		}
+		// 烤炉走反射路径拿内部容器（不是Inventory）
+		if (CookingForBlockheadsSupport.isOven(blockEntity)) {
+			if (!isContainerEnabled("oven") || CookingForBlockheadsSupport.isAutomationDisallowed()) {
+				return false;
+			}
+			int[] ovenDepositSlots = getDepositSlots(blockEntity, mode);
+			Inventory ovenInventory = CookingForBlockheadsSupport.getInternalInventory(blockEntity);
+			if (ovenDepositSlots == null || ovenInventory == null) {
+				return false;
+			}
+			return canAcceptAny(ovenInventory, ovenDepositSlots, held);
 		}
 		int[] slots = getDepositSlots(blockEntity, mode);
 		if (slots == null || !(blockEntity instanceof Inventory inventory)) {
@@ -878,6 +1043,18 @@ public final class OutputSlotExtractor {
 			blockEntity.markDirty();
 			return ActionResult.SUCCESS;
 		}
+		// 烤炉走反射路径拿内部容器（不是Inventory）
+		if (CookingForBlockheadsSupport.isOven(blockEntity)) {
+			if (!isContainerEnabled("oven") || CookingForBlockheadsSupport.isAutomationDisallowed()) {
+				return ActionResult.PASS;
+			}
+			Inventory ovenInventory = CookingForBlockheadsSupport.getInternalInventory(blockEntity);
+			if (ovenInventory == null || !restockFromInventory(player, world, ovenInventory, slots, containersLeft)) {
+				return ActionResult.PASS;
+			}
+			ovenInventory.markDirty();
+			return ActionResult.SUCCESS;
+		}
 		if (!(blockEntity instanceof Inventory inventory) || !restockFromInventory(player, world, inventory, slots, containersLeft)) {
 			return ActionResult.PASS;
 		}
@@ -890,34 +1067,122 @@ public final class OutputSlotExtractor {
 	}
 
 	/**
-	 * 连锁补货：把背包存货均匀分摊到Ultimine连锁形状内所有有补货需求的容器。
-	 * 槽位放不下的余量自动流向后面的容器。
-	 * 背包存货耗尽即止；音效只播放一次。
+	 * 连锁补货：把背包存货按物品类型分组，组内按权重（槽位剩余容量）分摊到连锁形状内所有补货槽。
+	 * 剩余越多的槽位补得越多，尽量补满；空槽不补；背包存货耗尽即止。
 	 */
 	private static ActionResult handleChainRestock(PlayerEntity player, World world, List<BlockPos> chain) {
-		// 第一遍：筛出有补货需求的容器（非空且未满的补货槽位，且背包有同类存货）
-		List<BlockPos> targets = new ArrayList<>();
+		// 第一遍：收集所有可补货的槽位（非空且未满、背包有同类存货）
+		List<RestockSlot> slots = new ArrayList<>();
+		Set<BlockEntity> dirty = new HashSet<>();
 		for (BlockPos pos : chain) {
 			BlockEntity be = world.getBlockEntity(pos);
-			if (be != null && hasRestockNeed(player, be)) {
-				targets.add(pos);
+			if (be == null) {
+				continue;
 			}
+			collectRestockSlots(player, be, slots, dirty);
 		}
-		if (targets.isEmpty()) {
+		if (slots.isEmpty()) {
 			return ActionResult.PASS;
 		}
-		// 第二遍：均分补货
-		int containersLeft = targets.size();
+
+		// 按物品类型分组，组内按权重（剩余容量）分配背包存货
 		boolean any = false;
-		for (BlockPos pos : targets) {
-			BlockEntity be = world.getBlockEntity(pos);
-			if (restockContainer(player, world, be, containersLeft) == ActionResult.SUCCESS) {
-				any = true;
+		for (int i = 0; i < slots.size(); i++) {
+			RestockSlot first = slots.get(i);
+			if (first == null) {
+				continue;
 			}
-			containersLeft--;
+			slots.set(i, null);
+			List<RestockSlot> group = new ArrayList<>();
+			group.add(first);
+			for (int j = i + 1; j < slots.size(); j++) {
+				RestockSlot other = slots.get(j);
+				if (other != null && isSameItem(first.template(), other.template())) {
+					group.add(other);
+					slots.set(j, null);
+				}
+			}
+			int stock = countInInventory(player, first.template());
+			if (stock <= 0) {
+				continue;
+			}
+			long totalNeed = 0;
+			for (RestockSlot g : group) {
+				totalNeed += g.need();
+			}
+			int[] share = new int[group.size()];
+			long allocated = 0;
+			for (int k = 0; k < group.size(); k++) {
+				share[k] = (int) ((long) stock * group.get(k).need() / totalNeed);
+				allocated += share[k];
+			}
+			// 余数补足给需求最大且未填满的槽位
+			int leftover = stock - (int) allocated;
+			while (leftover > 0) {
+				int best = -1;
+				for (int k = 0; k < group.size(); k++) {
+					if (share[k] < group.get(k).need() && (best == -1 || group.get(k).need() > group.get(best).need())) {
+						best = k;
+					}
+				}
+				if (best == -1) {
+					break;
+				}
+				share[best]++;
+				leftover--;
+			}
+			// 应用份额
+			for (int k = 0; k < group.size(); k++) {
+				if (share[k] <= 0) {
+					continue;
+				}
+				RestockSlot g = group.get(k);
+				if (g.pot()) {
+					// 厨锅：先模拟确认可放量，再扣背包并放入，避免丢物品
+					ItemStack probe = g.template().copy();
+					probe.setCount(share[k]);
+					int canInsert = FarmersDelightSupport.insertToSlot(world, g.be().getPos(), g.be(), g.slot(), probe, true);
+					if (canInsert <= 0) {
+						continue;
+					}
+					int taken = takeFromPlayerInventory(player, g.template(), canInsert);
+					if (taken <= 0) {
+						continue;
+					}
+					ItemStack portion = g.template().copy();
+					portion.setCount(taken);
+					int put = FarmersDelightSupport.insertToSlot(world, g.be().getPos(), g.be(), g.slot(), portion, false);
+					if (put < taken) {
+						giveBackToPlayer(player, taken - put, g.template());
+					}
+					any = true;
+				}
+				else {
+					int taken = takeFromPlayerInventory(player, g.template(), share[k]);
+					if (taken <= 0) {
+						continue;
+					}
+					ItemStack existing = g.inv().getStack(g.slot());
+					if (existing.isEmpty() || !isSameItem(existing, g.template())) {
+						// 槽位状态异常（理论上不会），退还
+						giveBackToPlayer(player, taken, g.template());
+						continue;
+					}
+					existing.increment(taken);
+					g.inv().setStack(g.slot(), existing);
+					any = true;
+				}
+			}
 		}
 		if (!any) {
 			return ActionResult.PASS;
+		}
+		for (BlockEntity be : dirty) {
+			be.markDirty();
+			if (AdAstraMachineSupport.isAdAstraMachine(be)) {
+				// Ad Astra机器在物品变化后需要同步
+				AdAstraMachineSupport.sync(be);
+			}
 		}
 		player.getInventory().markDirty();
 		finish(player, world, () -> {
@@ -925,40 +1190,74 @@ public final class OutputSlotExtractor {
 		return ActionResult.SUCCESS;
 	}
 
-	/**
-	 * 容器是否还有补货需求：存在非空且未满的补货槽位，且背包有同类存货。
-	 */
-	private static boolean hasRestockNeed(PlayerEntity player, BlockEntity blockEntity) {
-		int[] slots = getRestockSlots(blockEntity);
-		if (slots == null) {
-			return false;
+	/** 连锁补货的可补货槽位（need=剩余容量） */
+	private record RestockSlot(BlockEntity be, Inventory inv, int slot, boolean pot, ItemStack template, int need) {
+	}
+
+	/** 收集单个容器的可补货槽位，加入slots并登记dirty */
+	private static void collectRestockSlots(PlayerEntity player, BlockEntity be, List<RestockSlot> slots, Set<BlockEntity> dirty) {
+		int[] restockSlots = getRestockSlots(be);
+		if (restockSlots == null) {
+			return;
 		}
-		if (FarmersDelightSupport.isCookingPot(blockEntity)) {
-			if (!isContainerEnabled("cooking_pot") || blockEntity.getWorld() == null) {
-				return false;
+		if (FarmersDelightSupport.isCookingPot(be)) {
+			if (!isContainerEnabled("cooking_pot") || be.getWorld() == null) {
+				return;
 			}
-			for (int slot : slots) {
-				ItemStack existing = FarmersDelightSupport.getSlot(blockEntity.getWorld(), blockEntity.getPos(), blockEntity, slot);
-				if (existing != null && !existing.isEmpty() && existing.getCount() < existing.getMaxCount()
-						&& countInInventory(player, existing) > 0) {
-					return true;
+			for (int slot : restockSlots) {
+				ItemStack existing = FarmersDelightSupport.getSlot(be.getWorld(), be.getPos(), be, slot);
+				int need = restockNeed(existing);
+				if (need > 0 && countInInventory(player, existing) > 0) {
+					slots.add(new RestockSlot(be, null, slot, true, existing.copy(), need));
+					dirty.add(be);
 				}
 			}
-			return false;
+			return;
 		}
-		if (!(blockEntity instanceof Inventory inventory)) {
-			return false;
+		// 烤炉走反射路径拿内部容器（不是Inventory）
+		if (CookingForBlockheadsSupport.isOven(be)) {
+			if (!isContainerEnabled("oven") || CookingForBlockheadsSupport.isAutomationDisallowed()) {
+				return;
+			}
+			Inventory inv = CookingForBlockheadsSupport.getInternalInventory(be);
+			if (inv == null) {
+				return;
+			}
+			for (int slot : restockSlots) {
+				if (slot < 0 || slot >= inv.size()) {
+					continue;
+				}
+				ItemStack existing = inv.getStack(slot);
+				int need = restockNeed(existing);
+				if (need > 0 && countInInventory(player, existing) > 0) {
+					slots.add(new RestockSlot(be, inv, slot, false, existing.copy(), need));
+					dirty.add(be);
+				}
+			}
+			return;
 		}
-		for (int slot : slots) {
-			if (slot < 0 || slot >= inventory.size()) {
+		if (!(be instanceof Inventory inv)) {
+			return;
+		}
+		for (int slot : restockSlots) {
+			if (slot < 0 || slot >= inv.size()) {
 				continue;
 			}
-			ItemStack existing = inventory.getStack(slot);
-			if (!existing.isEmpty() && existing.getCount() < existing.getMaxCount() && countInInventory(player, existing) > 0) {
-				return true;
+			ItemStack existing = inv.getStack(slot);
+			int need = restockNeed(existing);
+			if (need > 0 && countInInventory(player, existing) > 0) {
+				slots.add(new RestockSlot(be, inv, slot, false, existing.copy(), need));
+				dirty.add(be);
 			}
 		}
-		return false;
+	}
+
+	/** 补货槽位的剩余容量；空槽/已满返回0 */
+	private static int restockNeed(ItemStack existing) {
+		if (existing == null || existing.isEmpty()) {
+			return 0;
+		}
+		return Math.max(0, existing.getMaxCount() - existing.getCount());
 	}
 
 	/**
@@ -1106,6 +1405,24 @@ public final class OutputSlotExtractor {
 			}
 			return;
 		}
+		// 烤炉走反射路径拿内部容器（不是Inventory）
+		if (CookingForBlockheadsSupport.isOven(blockEntity)) {
+			if (!isContainerEnabled("oven") || CookingForBlockheadsSupport.isAutomationDisallowed()) {
+				return;
+			}
+			Inventory ovenInventory = CookingForBlockheadsSupport.getInternalInventory(blockEntity);
+			int[] ovenRestockSlots = getRestockSlots(blockEntity);
+			if (ovenInventory == null || ovenRestockSlots == null) {
+				return;
+			}
+			for (int slot : ovenRestockSlots) {
+				if (slot < 0 || slot >= ovenInventory.size()) {
+					continue;
+				}
+				addRestockPreviewItem(items, ovenInventory.getStack(slot), player);
+			}
+			return;
+		}
 		int[] slots = getRestockSlots(blockEntity);
 		if (slots == null || !(blockEntity instanceof Inventory inventory)) {
 			return;
@@ -1248,6 +1565,15 @@ public final class OutputSlotExtractor {
 		if (WorktableSupport.isWorktable(blockEntity)) {
 			return isContainerEnabled("worktable") ? (mode == ExtractionMode.INPUT ? new int[] { 0 } : new int[] { 1 }) : null;
 		}
+
+		// ---------- Cooking for Blockheads ----------
+		// 烤炉：0-2输入 3燃料（走内部容器反射路径，isValid自动过滤非熔炼物/非燃料）
+		if (CookingForBlockheadsSupport.isOven(blockEntity)) {
+			if (!isContainerEnabled("oven") || CookingForBlockheadsSupport.isAutomationDisallowed()) {
+				return null;
+			}
+			return mode == ExtractionMode.INPUT ? CookingForBlockheadsSupport.getInputSlots() : CookingForBlockheadsSupport.getFuelSlots();
+		}
 		return null;
 	}
 
@@ -1279,6 +1605,23 @@ public final class OutputSlotExtractor {
 		}
 		// 燃料模式：容器槽
 		return new int[] { 7 };
+	}
+
+	/**
+	 * 烤炉在指定取出模式下的槽位（内部容器20格的全局索引）。
+	 * 0-2输入 3燃料 4-6输出；ALL=输入+燃料+输出（不含加工格7-15与工具格16-19）。
+	 */
+	private static int[] ovenSlots(ExtractionMode mode) {
+		if (mode == ExtractionMode.ALL) {
+			return CookingForBlockheadsSupport.getAllSlots();
+		}
+		if (mode == ExtractionMode.OUTPUT) {
+			return CookingForBlockheadsSupport.getOutputSlots();
+		}
+		if (mode == ExtractionMode.INPUT) {
+			return CookingForBlockheadsSupport.getInputSlots();
+		}
+		return CookingForBlockheadsSupport.getFuelSlots();
 	}
 
 	/**
