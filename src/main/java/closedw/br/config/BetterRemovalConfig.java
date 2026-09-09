@@ -70,6 +70,8 @@ public class BetterRemovalConfig implements IModConfig
 
         CATEGORIES.put("cookingforblockheads", List.of("oven"));
 
+        CATEGORIES.put("farm_and_charm", List.of("fc_cooking_pot", "roaster", "stove"));
+
         DEFAULT_VALUES.put("jade_preview", true);
         DEFAULT_VALUES.put("ftb_ultimine", true);
         DEFAULT_VALUES.put("deposit", true);
@@ -98,6 +100,9 @@ public class BetterRemovalConfig implements IModConfig
         DEFAULT_VALUES.put("culture_vat", true);
         DEFAULT_VALUES.put("worktable", true);
         DEFAULT_VALUES.put("oven", true);
+        DEFAULT_VALUES.put("fc_cooking_pot", true);
+        DEFAULT_VALUES.put("roaster", true);
+        DEFAULT_VALUES.put("stove", true);
 
         // FTB Ultimine连锁取出单次最多容器数量（64）
         INT_DEFAULTS.put("ftb_ultimine_max_containers", 64);

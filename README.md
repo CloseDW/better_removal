@@ -29,27 +29,30 @@ Pick a preset with the **Mode** keybinding (hold it, scroll to move through the 
 
 ### Extraction & Deposit
 
-| Container | Extract | Deposit (Input / Fuel) |
-|---|---|---|
-| Furnace / Blast Furnace / Smoker | yes | input slot / fuel slot |
-| Brewing Stand | yes | ingredient / blaze powder |
-| Hopper / Dispenser / Dropper | yes | every slot |
-| Farmer's Delight Basket | yes | every slot |
-| Farmer's Delight Cooking Pot | yes | input |
-| Cooking for Blockheads Oven | yes | input / fuel |
-| Ad Astra Compressor | yes | input |
-| Ad Astra Etrionic Blast Furnace | yes | inputs |
-| Ad Astra Fuel Refinery | yes | fluid + item inputs |
-| Ad Astra Oxygen Loader | yes | fluid + item inputs |
-| Ad Astra Cryo Freezer | yes | inputs |
-| Crabber's Delight Crab Trap | yes | bait slot |
-| The Aether Freezer / Altar | yes | input / fuel |
-| Vinery Fermentation Barrel | yes | inputs / wine bottle |
-| Vinery Apple Press | yes | inputs / wine bottle |
-| Fossils and Archeology Analyzer | yes | inputs |
-| Fossils and Archeology Sifter | yes | input |
-| Fossils and Archeology Culture Vat | yes | input / fuel |
-| Fossils and Archeology Worktable | yes | input / fuel |
+| Container                          | Extract | Deposit (Input / Fuel) |
+|------------------------------------|---------|--------------|
+| Furnace / Blast Furnace / Smoker   | yes     | input slot / fuel slot |
+| Brewing Stand                      | yes     | ingredient / blaze powder |
+| Hopper / Dispenser / Dropper       | yes     | every slot   |
+| Farmer's Delight Basket            | yes     | every slot   |
+| Farmer's Delight Cooking Pot       | yes     | input        |
+| Cooking for Blockheads Oven        | yes     | input / fuel |
+| Ad Astra Compressor                | yes     | input        |
+| Ad Astra Etrionic Blast Furnace    | yes     | inputs       |
+| Ad Astra Fuel Refinery             | yes     | fluid + item inputs |
+| Ad Astra Oxygen Loader             | yes     | fluid + item inputs |
+| Ad Astra Cryo Freezer              | yes     | inputs       |
+| Crabber's Delight Crab Trap        | yes     | bait slot    |
+| The Aether Freezer / Altar         | yes     | input / fuel |
+| Vinery Fermentation Barrel         | yes     | inputs / wine bottle |
+| Vinery Apple Press                 | yes     | inputs / wine bottle |
+| Farm & Charm Cooking Pot           | yes     | input / bowl |
+| Farm & Charm Roaster               | yes     | input / bowl |
+| Farm & Charm Stove                 | yes     | input / fuel |
+| Fossils and Archeology Analyzer    | yes     | inputs       |
+| Fossils and Archeology Sifter      | yes     | input        |
+| Fossils and Archeology Culture Vat | yes     | input / fuel |
+| Fossils and Archeology Worktable   | yes     | input / fuel |
 
 ---
 

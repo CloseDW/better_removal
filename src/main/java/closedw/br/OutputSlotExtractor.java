@@ -11,6 +11,7 @@ import closedw.br.aether.FreezerSupport;
 import closedw.br.config.BetterRemovalConfig;
 import closedw.br.cookingforblockheads.CookingForBlockheadsSupport;
 import closedw.br.crabbersdelight.CrabTrapSupport;
+import closedw.br.farmandcharm.FarmAndCharmSupport;
 import closedw.br.ftbultimine.FTBUltimineSupport;
 import closedw.br.farmersdelight.FarmersDelightSupport;
 import closedw.br.fossil.AnalyzerSupport;
@@ -233,6 +234,16 @@ public final class OutputSlotExtractor {
 					: new int[] { 1 };
 		}
 
+		// ---------- Farm & Charm ----------
+		// 厨房锅：0-5食材 6盘(消耗品) 7输出，无燃料槽；烤盘：同布局
+		// 炉灶：0输出 1-3食材 4燃料；三个都是原生Inventory，走通用路径
+		String farmAndCharmKey = FarmAndCharmSupport.getConfigKey(blockEntity);
+		if (farmAndCharmKey != null && isContainerEnabled(farmAndCharmKey)) {
+			return mode == ExtractionMode.OUTPUT ? FarmAndCharmSupport.getOutputSlots(blockEntity)
+					: mode == ExtractionMode.INPUT ? FarmAndCharmSupport.getInputSlots(blockEntity)
+					: FarmAndCharmSupport.getFuelSlots(blockEntity);
+		}
+
 		return null;
 	}
 
@@ -317,6 +328,11 @@ public final class OutputSlotExtractor {
 		// ---------- Cooking for Blockheads ----------
 		if (CookingForBlockheadsSupport.isOven(blockEntity)) {
 			return "oven";
+		}
+		// ---------- Farm & Charm ----------
+		String farmAndCharmKey = FarmAndCharmSupport.getConfigKey(blockEntity);
+		if (farmAndCharmKey != null) {
+			return farmAndCharmKey;
 		}
 		return null;
 	}
@@ -1573,6 +1589,16 @@ public final class OutputSlotExtractor {
 				return null;
 			}
 			return mode == ExtractionMode.INPUT ? CookingForBlockheadsSupport.getInputSlots() : CookingForBlockheadsSupport.getFuelSlots();
+		}
+
+		// ---------- Farm & Charm ----------
+		// 厨房锅/烤盘：0-5食材 6盘；炉灶：1-3食材 4燃料
+		// 这三个容器的 isValid 恒真，过滤完全靠这里的槽位表
+		String farmAndCharmKey = FarmAndCharmSupport.getConfigKey(blockEntity);
+		if (farmAndCharmKey != null) {
+			return isContainerEnabled(farmAndCharmKey)
+					? (mode == ExtractionMode.INPUT ? FarmAndCharmSupport.getInputSlots(blockEntity) : FarmAndCharmSupport.getFuelSlots(blockEntity))
+					: null;
 		}
 		return null;
 	}

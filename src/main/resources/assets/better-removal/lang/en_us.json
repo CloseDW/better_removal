@@ -27,6 +27,7 @@
   "config.better-removal.category.vinery": "Vinery",
   "config.better-removal.category.fossil": "Fossils and Archeology: Revival",
   "config.better-removal.category.cookingforblockheads": "Cooking for Blockheads",
+  "config.better-removal.category.farm_and_charm": "Farm & Charm",
   "config.better-removal.furnace": "Furnace",
   "config.better-removal.blast_furnace": "Blast Furnace",
   "config.better-removal.smoker": "Smoker",
@@ -50,5 +51,8 @@
   "config.better-removal.sifter": "Sifter",
   "config.better-removal.culture_vat": "Culture Vat",
   "config.better-removal.worktable": "Archeology Workbench",
-  "config.better-removal.oven": "Oven"
+  "config.better-removal.oven": "Oven",
+  "config.better-removal.fc_cooking_pot": "Cooking Pot (Farm & Charm)",
+  "config.better-removal.roaster": "Roaster",
+  "config.better-removal.stove": "Stove"
 }
