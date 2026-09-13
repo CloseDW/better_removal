@@ -4,11 +4,16 @@ import closedw.br.ExtractionAction;
 import closedw.br.ExtractionMode;
 import closedw.br.ExtractionModeManager;
 import closedw.br.ModeState;
+import closedw.br.OutputSlotExtractor;
+import closedw.br.experimental.AutoDetectSupport;
+import closedw.br.experimental.SlotRules;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 
 import java.util.List;
 
@@ -17,6 +22,7 @@ import java.util.List;
  *   /br extract output|input|fuel|all  取出模式（空手+修饰键右击）
  *   /br deposit input|fuel             放入模式（手持物品+修饰键右击）
  *   /br restock                        补货模式（空手+修饰键右击，从背包补充已有同类物品）
+ *   /br reload                         重新读取容器槽位规则（改完 json / 配置后不用重启）
  *   /br now 或裸 /br                   显示当前模式
  */
 public final class BetterRemovalCommand {
@@ -63,6 +69,25 @@ public final class BetterRemovalCommand {
 			}
 			ExtractionModeManager.setState(player, new ModeState(ExtractionAction.RESTOCK, ExtractionMode.ALL));
 			player.sendMessage(ExtractionModeManager.getStateMessage(new ModeState(ExtractionAction.RESTOCK, ExtractionMode.ALL)), false);
+			return 1;
+		}));
+
+		root.then(CommandManager.literal("reload").executes(ctx -> {
+			ServerPlayerEntity player = ctx.getSource().getPlayer();
+			if (player == null) {
+				return 0;
+			}
+			int count = SlotRules.reload();
+			// 顺带清掉主动探测的缓存，让改完白名单/规则后能重新探测
+			AutoDetectSupport.clearCaches();
+			// 配置改完后重新同步一次：模式滚轮据此决定是否显示"主动探测"
+			ExtractionModeManager.refreshClient(player);
+			if (!OutputSlotExtractor.isExperimentalEnabled()) {
+				player.sendMessage(Text.translatable("better-removal.message.rules_disabled")
+						.formatted(Formatting.RED), false);
+			}
+			player.sendMessage(Text.translatable("better-removal.message.rules_reloaded", count)
+					.formatted(Formatting.YELLOW), false);
 			return 1;
 		}));
 

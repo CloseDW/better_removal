@@ -40,6 +40,9 @@ public final class ExtractionModeManager {
 	/** 客户端缓存的当前模式（由服务端通过 S2C 包同步） */
 	private static volatile ModeState CLIENT_STATE = ModeState.DEFAULT;
 
+	/** 客户端缓存的"主动探测是否可用"（由服务端通过 S2C 包同步），模式滚轮据此决定是否多显示一个预设 */
+	private static volatile boolean CLIENT_PROBE_AVAILABLE = false;
+
 	static {
 		load();
 	}
@@ -113,6 +116,29 @@ public final class ExtractionModeManager {
 		CLIENT_STATE = state;
 	}
 
+	/** 客户端缓存的"主动探测是否可用"（供模式滚轮读取）。 */
+	public static boolean isClientProbeAvailable() {
+		return CLIENT_PROBE_AVAILABLE;
+	}
+
+	public static void setClientState(ModeState state, boolean probeAvailable) {
+		CLIENT_STATE = state;
+		CLIENT_PROBE_AVAILABLE = probeAvailable;
+	}
+
+	/**
+	 * 主动探测是否可用：实验性总开关 + 主动探测开关都打开。
+	 * 未安装 Configured 时读不到开关，按不可用处理。
+	 */
+	public static boolean isProbeAvailable() {
+		return OutputSlotExtractor.isExperimentalEnabled() && OutputSlotExtractor.isTransferProbeEnabled();
+	}
+
+	/** 重新向客户端同步模式与"主动探测是否可用"（配置改完后由 /br reload 调用）。 */
+	public static void refreshClient(ServerPlayerEntity player) {
+		ServerPlayNetworking.send(player, new ExtractionModeSyncS2CPacket(getState(player), isProbeAvailable()));
+	}
+
 	/** 注册模式设置数据包的接收器，并处理玩家加入时的模式同步。 */
 	public static void registerServerHandlers() {
 		ServerPlayNetworking.registerGlobalReceiver(ExtractionModeSetC2SPacket.TYPE, (packet, player, responseSender) -> {
@@ -121,12 +147,16 @@ public final class ExtractionModeManager {
 		});
 
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
-			ServerPlayNetworking.send(handler.player, new ExtractionModeSyncS2CPacket(getState(handler.player)));
+			ServerPlayNetworking.send(handler.player, new ExtractionModeSyncS2CPacket(getState(handler.player), isProbeAvailable()));
 		});
 	}
 
 	/** 防御非法组合：放入预设只允许 input/fuel；补货固定全部（槽位范围由补货行为决定） */
 	private static ModeState sanitize(ModeState state) {
+		if (state.action() == ExtractionAction.PROBE) {
+			// 主动探测不使用槽位模式（与补货同理，槽位名不显示）
+			return new ModeState(ExtractionAction.PROBE, ExtractionMode.ALL);
+		}
 		if (state.action() == ExtractionAction.DEPOSIT && state.mode() != ExtractionMode.INPUT && state.mode() != ExtractionMode.FUEL) {
 			return new ModeState(ExtractionAction.DEPOSIT, ExtractionMode.INPUT);
 		}
@@ -140,7 +170,7 @@ public final class ExtractionModeManager {
 		state = sanitize(state);
 		STATES.put(player.getUuid(), state);
 		save();
-		ServerPlayNetworking.send(player, new ExtractionModeSyncS2CPacket(state));
+		ServerPlayNetworking.send(player, new ExtractionModeSyncS2CPacket(state, isProbeAvailable()));
 		return state;
 	}
 
@@ -153,7 +183,7 @@ public final class ExtractionModeManager {
 		MutableText open = Text.literal("【").setStyle(Style.EMPTY.withColor(Formatting.AQUA));
 		MutableText action = Text.translatable(state.action().getTranslationKey())
 				.setStyle(Style.EMPTY.withColor(state.action().getAccentColor()));
-		if (state.action() == ExtractionAction.RESTOCK) {
+		if (!state.action().hasSlotMode()) {
 			return prefix.append(open).append(action)
 					.append(Text.literal("】").setStyle(Style.EMPTY.withColor(Formatting.AQUA)));
 		}

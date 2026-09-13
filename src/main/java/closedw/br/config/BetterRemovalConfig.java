@@ -48,6 +48,11 @@ public class BetterRemovalConfig implements IModConfig
      */
     public static final Map<String, Integer> INT_DEFAULTS = new LinkedHashMap<>();
 
+    /**
+     * 字符串列表配置键与默认值（实验性自动探测白名单等）。
+     */
+    public static final Map<String, List<String>> LIST_DEFAULTS = new LinkedHashMap<>();
+
     static
     {
         CATEGORIES.put("general", List.of("jade_preview", "ftb_ultimine", "deposit", "restock", "ftb_ultimine_max_containers"));
@@ -71,6 +76,8 @@ public class BetterRemovalConfig implements IModConfig
         CATEGORIES.put("cookingforblockheads", List.of("oven"));
 
         CATEGORIES.put("farm_and_charm", List.of("fc_cooking_pot", "roaster", "stove"));
+
+        CATEGORIES.put("experimental", List.of("experimental_auto_detect", "experimental_auto_detect_whitelist", "experimental_transfer_probe", "experimental_slot_rules"));
 
         DEFAULT_VALUES.put("jade_preview", true);
         DEFAULT_VALUES.put("ftb_ultimine", true);
@@ -104,12 +111,25 @@ public class BetterRemovalConfig implements IModConfig
         DEFAULT_VALUES.put("roaster", true);
         DEFAULT_VALUES.put("stove", true);
 
+        // 实验性：通用容器槽位自动探测，默认关闭；开启后必须配置白名单才生效
+        DEFAULT_VALUES.put("experimental_auto_detect", false);
+
+        // 实验性：主动探测模式（按住修饰键右击容器，把三次探测结果以规则 JSON 打到聊天框），默认关闭
+        // 同时也决定自动探测是否允许跑"用 quickMove 主动搬运"那个后端
+        DEFAULT_VALUES.put("experimental_transfer_probe", false);
+
         // FTB Ultimine连锁取出单次最多容器数量（64）
         INT_DEFAULTS.put("ftb_ultimine_max_containers", 64);
+
+        LIST_DEFAULTS.put("experimental_auto_detect_whitelist", List.of());
+
+        // 实验性：手写槽位规则，每条一条 "匹配串 角色=槽位..."，例如 ironfurnaces input=0 fuel=1 output=2
+        LIST_DEFAULTS.put("experimental_slot_rules", List.of());
     }
 
     private final Map<String, BooleanValue> values = new LinkedHashMap<>();
     private final Map<String, IntegerValue> intValues = new LinkedHashMap<>();
+    private final Map<String, StringListValue> listValues = new LinkedHashMap<>();
     private IConfigEntry root;
 
     private BetterRemovalConfig()
@@ -162,6 +182,19 @@ public class BetterRemovalConfig implements IModConfig
             }
             this.intValues.put(key, new IntegerValue(key, defaultValue, value));
         });
+        LIST_DEFAULTS.forEach((key, defaultValue) ->
+        {
+            List<String> value = new ArrayList<>();
+            for(String part : props.getProperty(key, "").split(","))
+            {
+                String entry = part.trim();
+                if(!entry.isEmpty())
+                {
+                    value.add(entry);
+                }
+            }
+            this.listValues.put(key, new StringListValue(key, defaultValue, value));
+        });
     }
 
     /**
@@ -182,6 +215,15 @@ public class BetterRemovalConfig implements IModConfig
         return value != null ? value.get() : INT_DEFAULTS.getOrDefault(key, 0);
     }
 
+    /**
+     * 查询字符串列表配置（未配置时返回默认值）。
+     */
+    public List<String> getList(String key)
+    {
+        StringListValue value = this.listValues.get(key);
+        return value != null ? value.get() : LIST_DEFAULTS.getOrDefault(key, List.of());
+    }
+
     @Override
     public void update(IConfigEntry entry)
     {
@@ -194,6 +236,7 @@ public class BetterRemovalConfig implements IModConfig
         Properties props = new Properties();
         this.values.forEach((key, value) -> props.setProperty(key, String.valueOf(value.get())));
         this.intValues.forEach((key, value) -> props.setProperty(key, String.valueOf(value.get())));
+        this.listValues.forEach((key, value) -> props.setProperty(key, String.join(",", value.get())));
         Path path = getPath();
         try
         {
@@ -220,7 +263,9 @@ public class BetterRemovalConfig implements IModConfig
                 List<IConfigEntry> entries = keys.stream()
                         .map(key -> (IConfigEntry) (INT_DEFAULTS.containsKey(key)
                                 ? new IntegerEntry(this.intValues.get(key))
-                                : new BooleanEntry(this.values.get(key))))
+                                : LIST_DEFAULTS.containsKey(key)
+                                        ? new ListEntry(this.listValues.get(key))
+                                        : new BooleanEntry(this.values.get(key))))
                         .toList();
                 children.add(new CategoryEntry(category, entries));
             });
@@ -363,6 +408,59 @@ public class BetterRemovalConfig implements IModConfig
         private final IntegerValue value;
 
         public IntegerEntry(IntegerValue value)
+        {
+            this.value = value;
+        }
+
+        @Override
+        public List<IConfigEntry> getChildren()
+        {
+            return List.of();
+        }
+
+        @Override
+        public boolean isRoot()
+        {
+            return false;
+        }
+
+        @Override
+        public boolean isLeaf()
+        {
+            return true;
+        }
+
+        @Override
+        public IConfigValue<?> getValue()
+        {
+            return this.value;
+        }
+
+        @Override
+        public String getEntryName()
+        {
+            return this.value.getName();
+        }
+
+        @Override
+        public Text getTooltip()
+        {
+            return this.value.getComment();
+        }
+
+        @Override
+        public String getTranslationKey()
+        {
+            return this.value.getTranslationKey();
+        }
+    }
+
+
+    public static class ListEntry implements IConfigEntry
+    {
+        private final StringListValue value;
+
+        public ListEntry(StringListValue value)
         {
             this.value = value;
         }

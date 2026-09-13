@@ -1,6 +1,7 @@
 package closedw.br;
 
 import closedw.br.command.BetterRemovalCommand;
+import closedw.br.experimental.SlotRules;
 import closedw.br.ftbultimine.FTBUltimineSupport;
 import closedw.br.networking.ExtractKeyStateManager;
 import net.fabricmc.api.ModInitializer;
@@ -28,6 +29,8 @@ public class BetterRemoval implements ModInitializer {
 		LOGGER.info("Loading Better Removal");
 
 		OutputSlotExtractor.register();
+		// 实验性：读取手写槽位规则（内置 / 其它模组自声明 / 用户配置文件）
+		SlotRules.load();
 		ExtractKeyStateManager.registerServerHandlers();
 		ExtractionModeManager.registerServerHandlers();
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->

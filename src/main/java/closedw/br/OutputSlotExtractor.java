@@ -11,6 +11,8 @@ import closedw.br.aether.FreezerSupport;
 import closedw.br.config.BetterRemovalConfig;
 import closedw.br.cookingforblockheads.CookingForBlockheadsSupport;
 import closedw.br.crabbersdelight.CrabTrapSupport;
+import closedw.br.experimental.AutoDetectSupport;
+import closedw.br.experimental.SlotProbeReport;
 import closedw.br.farmandcharm.FarmAndCharmSupport;
 import closedw.br.ftbultimine.FTBUltimineSupport;
 import closedw.br.farmersdelight.FarmersDelightSupport;
@@ -33,6 +35,7 @@ import net.minecraft.block.entity.SmokerBlockEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.inventory.Inventory;
 import net.minecraft.item.ItemStack;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.ActionResult;
@@ -90,6 +93,40 @@ public final class OutputSlotExtractor {
 	}
 
 	/**
+	 * 实验性功能总开关（Configured 中的 experimental_auto_detect，默认关闭）。
+	 * 手写槽位规则与自动探测都受它约束。
+	 * 未安装 Configured 时读不到这个开关，按“关闭”处理（与其它容器开关的默认启用语义不同）。
+	 */
+	public static boolean isExperimentalEnabled() {
+		try {
+			return BetterRemovalConfig.get().isEnabled("experimental_auto_detect");
+		}
+		catch (LinkageError e) {
+			return false;
+		}
+	}
+
+	/**
+	 * 查询字符串列表配置（实验性自动探测白名单）。未安装Configured时返回空列表。
+	 */
+	public static List<String> getConfigList(String key) {
+		try {
+			return BetterRemovalConfig.get().getList(key);
+		}
+		catch (LinkageError e) {
+			return List.of();
+		}
+	}
+
+	/**
+	 * 实验性：是否允许用 quickMove（模拟 shift 点击）主动探测槽位，默认开启。
+	 * 只在实验性总开关已打开、且容器命中白名单时才会被用到；探测物会立刻还原。
+	 */
+	public static boolean isTransferProbeEnabled() {
+		return isContainerEnabled("experimental_transfer_probe");
+	}
+
+	/**
 	 * 修饰键是否按住：左Alt（可改键）。
 	 */
 	public static boolean isModifierHeld(PlayerEntity player) {
@@ -109,10 +146,11 @@ public final class OutputSlotExtractor {
 			return ovenSlots(mode);
 		}
 
-		if (mode == ExtractionMode.ALL) {
-			// ALL受容器开关约束，不允许绕过配置
+		// ALL受容器开关约束，不允许绕过配置。
+		// 未知容器（实验性自动探测）不在此返回，改由方法末尾的兜底分支处理。
+		if (mode == ExtractionMode.ALL && getConfigKey(blockEntity) != null) {
 			String key = getConfigKey(blockEntity);
-			return key != null && isContainerEnabled(key) ? allSlots(blockEntity) : null;
+			return isContainerEnabled(key) ? allSlots(blockEntity) : null;
 		}
 
 		// ---------- 原版 ----------
@@ -242,6 +280,21 @@ public final class OutputSlotExtractor {
 			return mode == ExtractionMode.OUTPUT ? FarmAndCharmSupport.getOutputSlots(blockEntity)
 					: mode == ExtractionMode.INPUT ? FarmAndCharmSupport.getInputSlots(blockEntity)
 					: FarmAndCharmSupport.getFuelSlots(blockEntity);
+		}
+
+		// ---------- 实验性：通用容器支持（总开关默认关闭）----------
+		// 优先级1：手写槽位规则（显式声明，精确，不需要白名单）
+		if (getConfigKey(blockEntity) == null && AutoDetectSupport.hasRule(blockEntity)) {
+			return AutoDetectSupport.getRuleSlotsForMode(blockEntity, mode);
+		}
+
+		// 优先级2：自动探测（需要白名单命中）
+		// 依次尝试：GUI菜单语义 -> 原版容器接口启发式，见 AutoDetectSupport
+		if (getConfigKey(blockEntity) == null && AutoDetectSupport.isEnabledFor(blockEntity)) {
+			int[] auto = AutoDetectSupport.getSlotsForMode(blockEntity, mode);
+			if (auto != null) {
+				return auto;
+			}
 		}
 
 		return null;
@@ -485,6 +538,24 @@ public final class OutputSlotExtractor {
 		}
 
 		ModeState state = ExtractionModeManager.getState(player);
+
+		// ---------- 主动探测（实验性）：三次槽位探测的结果打印到聊天框，不动容器 ----------
+		if (state.action() == ExtractionAction.PROBE) {
+			if (!ExtractionModeManager.isProbeAvailable()) {
+				// 开关关掉后玩家可能还停在"主动探测"模式
+				return ActionResult.PASS;
+			}
+			if (!(player instanceof ServerPlayerEntity serverPlayer)) {
+				return ActionResult.PASS;
+			}
+			BlockEntity blockEntity = world.getBlockEntity(hitResult.getBlockPos());
+			if (blockEntity == null) {
+				return ActionResult.PASS;
+			}
+			SlotProbeReport.send(serverPlayer, blockEntity);
+			return ActionResult.SUCCESS;
+		}
+
 		boolean emptyHands = player.getMainHandStack().isEmpty() && player.getOffHandStack().isEmpty();
 
 		// ---------- 取出（空手）/ 补货（空手）----------
@@ -1390,34 +1461,81 @@ public final class OutputSlotExtractor {
 	}
 
 	/**
-	 * Jade补货预览：列出可补充的已有物品（同类去重）。
-	 * 按住Ultimine键（连锁生效）时汇总整个连锁形状的可补物品，否则只看当前容器。
+	 * Jade补货预览：列出将从玩家背包补入容器的物品及数量（同类去重）。
+	 * 数量 = min(同类槽位剩余容量总和, 背包同类存货)，与补货实际移动数一致。
+	 * 按住Ultimine键（连锁生效）时汇总整个连锁形状，否则只看当前容器。
 	 */
 	public static List<ItemStack> collectRestockPreview(BlockEntity blockEntity, PlayerEntity player) {
-		List<ItemStack> items = new ArrayList<>();
-		// 连锁补货：汇总整个连锁形状
-		List<BlockPos> chain = player == null ? null : getChainPositions(player, blockEntity.getPos());
+		if (player == null) {
+			return List.of();
+		}
+		// 收集整个连锁形状（或单个容器）内所有可补货槽位
+		List<RestockCandidate> candidates = new ArrayList<>();
+		List<BlockPos> chain = getChainPositions(player, blockEntity.getPos());
 		if (chain != null && blockEntity.getWorld() != null) {
 			for (BlockPos pos : chain) {
 				BlockEntity be = blockEntity.getWorld().getBlockEntity(pos);
 				if (be != null) {
-					collectRestockPreviewSingle(items, be, player);
+					collectRestockCandidates(candidates, be);
 				}
 			}
-			return items;
 		}
-		collectRestockPreviewSingle(items, blockEntity, player);
+		else {
+			collectRestockCandidates(candidates, blockEntity);
+		}
+
+		// 按物品类型分组，累加槽位需求量，补货量 = min(总需求量, 背包同类存货)
+		List<ItemStack> items = new ArrayList<>();
+		for (int i = 0; i < candidates.size(); i++) {
+			RestockCandidate first = candidates.get(i);
+			if (first == null) {
+				continue;
+			}
+			candidates.set(i, null);
+			long totalNeed = first.need();
+			for (int j = i + 1; j < candidates.size(); j++) {
+				RestockCandidate other = candidates.get(j);
+				if (other != null && isSameItem(first.template(), other.template())) {
+					totalNeed += other.need();
+					candidates.set(j, null);
+				}
+			}
+			int stock = countInInventory(player, first.template());
+			if (stock <= 0) {
+				continue;
+			}
+			int toAdd = (int) Math.min(totalNeed, stock);
+			if (toAdd <= 0) {
+				continue;
+			}
+			ItemStack display = first.template().copy();
+			display.setCount(toAdd);
+			items.add(display);
+		}
 		return items;
 	}
 
-	/** 单个容器的补货预览收集 */
-	private static void collectRestockPreviewSingle(List<ItemStack> items, BlockEntity blockEntity, PlayerEntity player) {
+	/** 补货预览的可补货槽位 */
+	private record RestockCandidate(ItemStack template, int need) {
+	}
+
+	/** 收集单个容器的可补货槽位（槽位非空且未满），加入candidates */
+	private static void collectRestockCandidates(List<RestockCandidate> candidates, BlockEntity blockEntity) {
+		int[] slots = getRestockSlots(blockEntity);
+		if (slots == null) {
+			return;
+		}
+		// Farmer's Delight厨锅走反射路径
 		if (FarmersDelightSupport.isCookingPot(blockEntity)) {
 			if (!isContainerEnabled("cooking_pot") || blockEntity.getWorld() == null) {
 				return;
 			}
-			for (int slot : cookingPotDepositSlots(ExtractionMode.INPUT)) {
-				addRestockPreviewItem(items, FarmersDelightSupport.getSlot(blockEntity.getWorld(), blockEntity.getPos(), blockEntity, slot), player);
+			for (int slot : slots) {
+				ItemStack existing = FarmersDelightSupport.getSlot(blockEntity.getWorld(), blockEntity.getPos(), blockEntity, slot);
+				int need = restockNeed(existing);
+				if (need > 0) {
+					candidates.add(new RestockCandidate(existing.copy(), need));
+				}
 			}
 			return;
 		}
@@ -1427,55 +1545,34 @@ public final class OutputSlotExtractor {
 				return;
 			}
 			Inventory ovenInventory = CookingForBlockheadsSupport.getInternalInventory(blockEntity);
-			int[] ovenRestockSlots = getRestockSlots(blockEntity);
-			if (ovenInventory == null || ovenRestockSlots == null) {
+			if (ovenInventory == null) {
 				return;
 			}
-			for (int slot : ovenRestockSlots) {
+			for (int slot : slots) {
 				if (slot < 0 || slot >= ovenInventory.size()) {
 					continue;
 				}
-				addRestockPreviewItem(items, ovenInventory.getStack(slot), player);
+				ItemStack existing = ovenInventory.getStack(slot);
+				int need = restockNeed(existing);
+				if (need > 0) {
+					candidates.add(new RestockCandidate(existing.copy(), need));
+				}
 			}
 			return;
 		}
-		int[] slots = getRestockSlots(blockEntity);
-		if (slots == null || !(blockEntity instanceof Inventory inventory)) {
+		if (!(blockEntity instanceof Inventory inventory)) {
 			return;
 		}
 		for (int slot : slots) {
 			if (slot < 0 || slot >= inventory.size()) {
 				continue;
 			}
-			addRestockPreviewItem(items, inventory.getStack(slot), player);
-		}
-	}
-
-	/** 补货预览项：槽位非空、未满、背包有同类存货、同类尚未展示 */
-	private static void addRestockPreviewItem(List<ItemStack> items, ItemStack existing, PlayerEntity player) {
-		if (existing == null || existing.isEmpty() || existing.getCount() >= existing.getMaxCount()) {
-			return;
-		}
-		if (!hasStockInInventory(player, existing)) {
-			return;
-		}
-		for (ItemStack shown : items) {
-			if (isSameItem(shown, existing)) {
-				return;
+			ItemStack existing = inventory.getStack(slot);
+			int need = restockNeed(existing);
+			if (need > 0) {
+				candidates.add(new RestockCandidate(existing.copy(), need));
 			}
 		}
-		items.add(existing.copy());
-	}
-
-	/** 玩家主背包是否存有与template同类的物品 */
-	private static boolean hasStockInInventory(PlayerEntity player, ItemStack template) {
-		DefaultedList<ItemStack> main = player.getInventory().main;
-		for (int i = 0; i < main.size(); i++) {
-			if (isSameItem(main.get(i), template)) {
-				return true;
-			}
-		}
-		return false;
 	}
 
 	/**
@@ -1600,6 +1697,18 @@ public final class OutputSlotExtractor {
 					? (mode == ExtractionMode.INPUT ? FarmAndCharmSupport.getInputSlots(blockEntity) : FarmAndCharmSupport.getFuelSlots(blockEntity))
 					: null;
 		}
+
+		// ---------- 实验性：通用容器支持（总开关默认关闭）----------
+		// 优先级1：手写槽位规则（显式声明，精确，不需要白名单）
+		if (getConfigKey(blockEntity) == null && AutoDetectSupport.hasRule(blockEntity)) {
+			return AutoDetectSupport.getRuleSlotsForMode(blockEntity, mode);
+		}
+
+		// 优先级2：自动探测（需要白名单命中）
+		if (getConfigKey(blockEntity) == null && AutoDetectSupport.isEnabledFor(blockEntity)) {
+			return AutoDetectSupport.getDepositSlots(blockEntity, mode);
+		}
+
 		return null;
 	}
 

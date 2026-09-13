@@ -32,9 +32,9 @@ public class BetterRemovalClient implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		// 接收服务端同步的取出/放入模式
+		// 接收服务端同步的取出/放入模式，以及"主动探测"是否可用
 		ClientPlayNetworking.registerGlobalReceiver(ExtractionModeSyncS2CPacket.TYPE, (packet, player, responseSender) ->
-				ExtractionModeManager.setClientState(new ModeState(packet.action(), packet.mode())));
+				ExtractionModeManager.setClientState(new ModeState(packet.action(), packet.mode()), packet.probeAvailable()));
 
 		registerModeKey();
 		registerExtractKey();
