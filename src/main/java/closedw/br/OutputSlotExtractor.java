@@ -1192,7 +1192,8 @@ public final class OutputSlotExtractor {
 			int[] share = new int[group.size()];
 			long allocated = 0;
 			for (int k = 0; k < group.size(); k++) {
-				share[k] = (int) ((long) stock * group.get(k).need() / totalNeed);
+				// 每个槽位最多补到剩余容量（need），避免背包存货多于总需求时超量取出被容器上限截断而吞物品
+				share[k] = (int) Math.min(group.get(k).need(), (long) stock * group.get(k).need() / totalNeed);
 				allocated += share[k];
 			}
 			// 余数补足给需求最大且未填满的槽位
