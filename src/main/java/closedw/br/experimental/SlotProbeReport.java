@@ -3,32 +3,33 @@ package closedw.br.experimental;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.inventory.Inventory;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.text.ClickEvent;
+import net.minecraft.text.HoverEvent;
 import net.minecraft.text.MutableText;
+import net.minecraft.text.Style;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Supplier;
 
 /**
  * 实验性：主动探测。
- * <p>玩家处于"主动探测"模式时，按住修饰键右击容器，服务端依次跑三个探测后端：
+ * 玩家处于"主动探测"模式时，按住修饰键右击容器，服务端依次跑两个探测后端：
  * ① 菜单只读：读容器自己 GUI 菜单里 {@code canInsert}/{@code canTakeItems}/{@code isEnabled} 声明；
- * ② 主动搬运：用探测物跑一遍容器自己的 {@code quickMove}（shift 点击的搬运规则），看完落到哪个槽；
- * ③ 库存接口：直接问 {@link Inventory#isValid} / {@code SidedInventory.canExtract}。
- * 三次探测的结果各自拼成一行规则 JSON 打印到聊天框，玩家挑一条复制进
- * {@code config/better-removal/containers/*.json}（或 Configured 的"容器槽位规则"）即可生效；
- * 某个后端判定不出任何槽位时，该行显示"无法探测"。只输出文本，不写任何文件；探测物会立刻还原，容器内容不变。
+ * ② 库存接口：直接问 {@link Inventory#isValid} / {@code SidedInventory.canExtract}。
+ * 每个后端各输出两行，点击即可复制：JSON 粘进 {@code config/better-removal/containers/*.json}，
+ * 规则串粘进 Configured 的"容器槽位规则"。
+ * 某个后端判定不出任何槽位时显示"无法探测"。只输出文本。
  */
 public final class SlotProbeReport {
 
 	private SlotProbeReport() {
 	}
 
-	/** 跑三次探测并把结果打印到该玩家的聊天框。 */
+	/** 跑两次探测并把结果打印到该玩家的聊天框。 */
 	public static void send(ServerPlayerEntity player, BlockEntity blockEntity) {
 		String match = matchKey(blockEntity);
 		int size = size(blockEntity);
@@ -36,33 +37,54 @@ public final class SlotProbeReport {
 		player.sendMessage(Text.translatable("better-removal.message.probe_header", match)
 				.formatted(Formatting.AQUA), false);
 
-		line(player, "better-removal.message.probe_menu", match, size,
+		report(player, "better-removal.message.probe_menu", match, size,
 				probe(() -> MenuSlotSupport.detect(blockEntity)), Formatting.GREEN);
-		line(player, "better-removal.message.probe_transfer", match, size,
-				probe(() -> toRoles(MenuTransferSupport.probeRaw(blockEntity), size)), Formatting.GOLD);
-		line(player, "better-removal.message.probe_inventory", match, size,
+		report(player, "better-removal.message.probe_inventory", match, size,
 				probe(() -> inventoryRoles(blockEntity)), Formatting.LIGHT_PURPLE);
-
-		player.sendMessage(Text.translatable("better-removal.message.probe_hint")
-				.formatted(Formatting.GRAY), false);
 	}
 
-	/** 打印一行：标签 + 规则 JSON（或"无法探测"）。 */
-	private static void line(ServerPlayerEntity player, String labelKey, String match, int size,
+	/** 打印一个后端的标题行，以及 JSON / 规则串两行可复制的文本。 */
+	private static void report(ServerPlayerEntity player, String labelKey, String match, int size,
 			SlotRole[] roles, Formatting color) {
-		String json = roles == null ? null : toJson(match, roles, size);
-		MutableText line = Text.translatable(labelKey).formatted(color).append(Text.literal(": "));
+		player.sendMessage(Text.translatable(labelKey).formatted(color), false);
+		if (roles == null) {
+			failed(player);
+			return;
+		}
+		RoleSlots slots = collectRoles(roles, size);
+		String json = toJson(match, slots);
 		if (json == null) {
-			line.append(Text.translatable("better-removal.message.probe_failed").formatted(Formatting.RED));
+			failed(player);
+			return;
 		}
-		else {
-			line.append(Text.literal(json).formatted(Formatting.WHITE));
-		}
+		sendCopyable(player, "better-removal.message.probe_format_json", json);
+		sendCopyable(player, "better-removal.message.probe_format_rules", toConfigRule(match, slots));
+	}
+
+	private static void failed(ServerPlayerEntity player) {
+		player.sendMessage(Text.literal("  ")
+				.append(Text.translatable("better-removal.message.probe_failed").formatted(Formatting.RED)), false);
+	}
+
+	private static void sendCopyable(ServerPlayerEntity player, String labelKey, String value) {
+		MutableText line = Text.literal("  ")
+				.append(Text.translatable(labelKey).formatted(Formatting.GRAY))
+				.append(Text.literal(": "))
+				.append(copyable(value));
 		player.sendMessage(line, false);
 	}
 
-	/** 探针数组 -> 规则 JSON；一个槽位都没判定出来时返回 null。 */
-	private static String toJson(String match, SlotRole[] roles, int size) {
+	/** 可点击复制的文本：点击复制到剪贴板，悬停给出提示。 */
+	private static MutableText copyable(String value) {
+		return Text.literal(value).setStyle(Style.EMPTY
+				.withColor(Formatting.WHITE)
+				.withClickEvent(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, value))
+				.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+						Text.translatable("better-removal.message.probe_copy_hint"))));
+	}
+
+	/** 把探测出的槽位按角色收集成三组。 */
+	private static RoleSlots collectRoles(SlotRole[] roles, int size) {
 		List<Integer> input = new ArrayList<>();
 		List<Integer> fuel = new ArrayList<>();
 		List<Integer> output = new ArrayList<>();
@@ -80,19 +102,34 @@ public final class SlotProbeReport {
 				}
 			}
 		}
-		if (input.isEmpty() && fuel.isEmpty() && output.isEmpty()) {
-			// 三份都没结果时提示"无法探测"，不要给出一条什么都没说的空规则
+		return new RoleSlots(input, fuel, output);
+	}
+
+	/** JSON 规则；一个槽位都没判定出来时返回 null。 */
+	private static String toJson(String match, RoleSlots roles) {
+		if (roles.isEmpty()) {
 			return null;
 		}
 		StringBuilder json = new StringBuilder("{\"match\":\"").append(match).append('"');
-		append(json, "input", input);
-		append(json, "fuel", fuel);
-		append(json, "output", output);
+		appendJson(json, "input", roles.input());
+		appendJson(json, "fuel", roles.fuel());
+		appendJson(json, "output", roles.output());
 		return json.append('}').toString();
 	}
 
-	/** 只写非空的角色数组：没提到的槽位规则不会去动 */
-	private static void append(StringBuilder json, String key, List<Integer> slots) {
+	/** Configured"容器槽位规则"格式：{@code <匹配串> input=0,1 fuel=2 output=3}；无结果返回 null。 */
+	private static String toConfigRule(String match, RoleSlots roles) {
+		if (roles.isEmpty()) {
+			return null;
+		}
+		StringBuilder rule = new StringBuilder(match);
+		appendRule(rule, "input", roles.input());
+		appendRule(rule, "fuel", roles.fuel());
+		appendRule(rule, "output", roles.output());
+		return rule.toString();
+	}
+
+	private static void appendJson(StringBuilder json, String key, List<Integer> slots) {
 		if (slots.isEmpty()) {
 			return;
 		}
@@ -106,6 +143,19 @@ public final class SlotProbeReport {
 		json.append(']');
 	}
 
+	private static void appendRule(StringBuilder rule, String key, List<Integer> slots) {
+		if (slots.isEmpty()) {
+			return;
+		}
+		rule.append(' ').append(key).append('=');
+		for (int i = 0; i < slots.size(); i++) {
+			if (i > 0) {
+				rule.append(',');
+			}
+			rule.append(slots.get(i).intValue());
+		}
+	}
+
 	/** 规则匹配串：优先用方块ID，取不到时退回"@方块实体类名" */
 	private static String matchKey(BlockEntity blockEntity) {
 		Identifier id = SlotRules.blockId(blockEntity);
@@ -117,20 +167,6 @@ public final class SlotProbeReport {
 			return null;
 		}
 		return AutoDetectSupport.inventoryRoles(inventory);
-	}
-
-	private static SlotRole[] toRoles(Map<Integer, SlotRole> probed, int size) {
-		if (probed == null || size < 0) {
-			return null;
-		}
-		SlotRole[] roles = new SlotRole[size];
-		for (Map.Entry<Integer, SlotRole> entry : probed.entrySet()) {
-			int slot = entry.getKey();
-			if (slot >= 0 && slot < size) {
-				roles[slot] = entry.getValue();
-			}
-		}
-		return roles;
 	}
 
 	/** 容器槽位数；不是 {@link Inventory} 时返回 -1 */
@@ -153,6 +189,12 @@ public final class SlotProbeReport {
 		}
 		catch (Throwable t) {
 			return null;
+		}
+	}
+
+	private record RoleSlots(List<Integer> input, List<Integer> fuel, List<Integer> output) {
+		boolean isEmpty() {
+			return this.input.isEmpty() && this.fuel.isEmpty() && this.output.isEmpty();
 		}
 	}
 }

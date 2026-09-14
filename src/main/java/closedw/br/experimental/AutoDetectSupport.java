@@ -154,21 +154,13 @@ public final class AutoDetectSupport {
 	}
 
 	/**
-	 * 依次尝试各个探测后端，返回第一个能给出结果的那个
+	 * 依次尝试各个探测后端，返回第一个能给出结果的那个。
 	 */
 	private static Detection detect(BlockEntity blockEntity, Inventory inventory) {
-		// 优先级1：GUI 菜单语义（只读判定），命中后再用 quickMove 主动探测修正输入/燃料槽
+		// 优先级1：GUI 菜单语义（只读判定）
 		SlotRole[] menuRoles = MenuSlotSupport.detect(blockEntity);
 		if (menuRoles != null && menuRoles.length == inventory.size()) {
-			String source = "menu";
-			if (OutputSlotExtractor.isTransferProbeEnabled()) {
-				SlotRole[] refined = MenuTransferSupport.refine(blockEntity, menuRoles);
-				if (refined != null) {
-					menuRoles = refined;
-					source = "menu+transfer";
-				}
-			}
-			return new Detection(menuRoles, source);
+			return new Detection(menuRoles, "menu");
 		}
 
 		// 优先级2：容器接口启发式
@@ -179,13 +171,6 @@ public final class AutoDetectSupport {
 			}
 		}
 		return null;
-	}
-
-	/**
-	 * 清空各种探测缓存（{@code /br reload} 时调用）：让改完配置/规则后重新探测。
-	 */
-	public static void clearCaches() {
-		MenuTransferSupport.clearCache();
 	}
 
 	/**

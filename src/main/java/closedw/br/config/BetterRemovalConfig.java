@@ -33,10 +33,14 @@ public class BetterRemovalConfig implements IModConfig
     private static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
     /**
-     * 配置分组：分组名->配置键列表
-     * 不同模组的容器按模组分类
+     * 顶层分组：分组名->配置键列表（不含“容器开关”，它由 {@link #CONTAINER_CATEGORIES} 组合而成）。
      */
     public static final Map<String, List<String>> CATEGORIES = new LinkedHashMap<>();
+
+    /**
+     * “容器开关”大类下的各模组子分组：子分组名->配置键列表。
+     */
+    public static final Map<String, List<String>> CONTAINER_CATEGORIES = new LinkedHashMap<>();
 
     /**
      * 配置键与默认值。
@@ -55,29 +59,26 @@ public class BetterRemovalConfig implements IModConfig
 
     static
     {
-        CATEGORIES.put("general", List.of("jade_preview", "ftb_ultimine", "deposit", "restock", "ftb_ultimine_max_containers"));
-
-        CATEGORIES.put("vanilla", List.of(
+        // 三个顶层大类：容器开关 / 实验性 / 通用；“容器开关”下再按模组分子类
+        CONTAINER_CATEGORIES.put("vanilla", List.of(
                 "furnace", "blast_furnace", "smoker", "brewing_stand",
                 "hopper", "dispenser", "dropper"));
+        CONTAINER_CATEGORIES.put("farmersdelight", List.of("cooking_pot", "basket"));
+        CONTAINER_CATEGORIES.put("ad_astra", List.of("compressor", "etrionic_blast_furnace", "fuel_refinery", "oxygen_loader", "cryo_freezer"));
+        CONTAINER_CATEGORIES.put("crabbersdelight", List.of("crab_trap"));
+        CONTAINER_CATEGORIES.put("aether", List.of("freezer", "altar"));
+        CONTAINER_CATEGORIES.put("vinery", List.of("fermentation_barrel", "apple_press"));
+        CONTAINER_CATEGORIES.put("fossil", List.of("analyzer", "sifter", "culture_vat", "worktable"));
+        CONTAINER_CATEGORIES.put("cookingforblockheads", List.of("oven"));
+        CONTAINER_CATEGORIES.put("farm_and_charm", List.of("fc_cooking_pot", "roaster", "stove"));
 
-        CATEGORIES.put("farmersdelight", List.of("cooking_pot", "basket"));
+        CATEGORIES.put("experimental", List.of(
+                "experimental_auto_detect", "experimental_auto_detect_whitelist",
+                "experimental_transfer_probe", "experimental_slot_rules"));
 
-        CATEGORIES.put("ad_astra", List.of("compressor", "etrionic_blast_furnace", "fuel_refinery", "oxygen_loader", "cryo_freezer"));
+        CATEGORIES.put("general", List.of(
+                "jade_preview", "ftb_ultimine", "deposit", "restock", "ftb_ultimine_max_containers"));
 
-        CATEGORIES.put("crabbersdelight", List.of("crab_trap"));
-
-        CATEGORIES.put("aether", List.of("freezer", "altar"));
-
-        CATEGORIES.put("vinery", List.of("fermentation_barrel", "apple_press"));
-
-        CATEGORIES.put("fossil", List.of("analyzer", "sifter", "culture_vat", "worktable"));
-
-        CATEGORIES.put("cookingforblockheads", List.of("oven"));
-
-        CATEGORIES.put("farm_and_charm", List.of("fc_cooking_pot", "roaster", "stove"));
-
-        CATEGORIES.put("experimental", List.of("experimental_auto_detect", "experimental_auto_detect_whitelist", "experimental_transfer_probe", "experimental_slot_rules"));
 
         DEFAULT_VALUES.put("jade_preview", true);
         DEFAULT_VALUES.put("ftb_ultimine", true);
@@ -114,8 +115,7 @@ public class BetterRemovalConfig implements IModConfig
         // 实验性：通用容器槽位自动探测，默认关闭；开启后必须配置白名单才生效
         DEFAULT_VALUES.put("experimental_auto_detect", false);
 
-        // 实验性：主动探测模式（按住修饰键右击容器，把三次探测结果以规则 JSON 打到聊天框），默认关闭
-        // 同时也决定自动探测是否允许跑"用 quickMove 主动搬运"那个后端
+        // 实验性：主动探测模式（按住修饰键右击容器，把槽位探测结果以规则 JSON 打到聊天框），默认关闭
         DEFAULT_VALUES.put("experimental_transfer_probe", false);
 
         // FTB Ultimine连锁取出单次最多容器数量（64）
@@ -123,7 +123,7 @@ public class BetterRemovalConfig implements IModConfig
 
         LIST_DEFAULTS.put("experimental_auto_detect_whitelist", List.of());
 
-        // 实验性：手写槽位规则，每条一条 "匹配串 角色=槽位..."，例如 ironfurnaces input=0 fuel=1 output=2
+        // 实验性：手写槽位规则，每条一条 "匹配串 角色=槽位..."
         LIST_DEFAULTS.put("experimental_slot_rules", List.of());
     }
 
@@ -185,7 +185,8 @@ public class BetterRemovalConfig implements IModConfig
         LIST_DEFAULTS.forEach((key, defaultValue) ->
         {
             List<String> value = new ArrayList<>();
-            for(String part : props.getProperty(key, "").split(","))
+            // 用换行分隔，避免与规则本身的逗号（槽位表 / 逗号 match）冲突
+            for(String part : props.getProperty(key, "").split("\n"))
             {
                 String entry = part.trim();
                 if(!entry.isEmpty())
@@ -236,7 +237,7 @@ public class BetterRemovalConfig implements IModConfig
         Properties props = new Properties();
         this.values.forEach((key, value) -> props.setProperty(key, String.valueOf(value.get())));
         this.intValues.forEach((key, value) -> props.setProperty(key, String.valueOf(value.get())));
-        this.listValues.forEach((key, value) -> props.setProperty(key, String.join(",", value.get())));
+        this.listValues.forEach((key, value) -> props.setProperty(key, String.join("\n", value.get())));
         Path path = getPath();
         try
         {
@@ -258,20 +259,32 @@ public class BetterRemovalConfig implements IModConfig
         if(this.root == null)
         {
             List<IConfigEntry> children = new ArrayList<>();
+
+            // 容器开关：大类下按模组分子类
+            List<IConfigEntry> containerChildren = new ArrayList<>();
+            CONTAINER_CATEGORIES.forEach((category, keys) ->
+                    containerChildren.add(new CategoryEntry(category, leafEntries(keys))));
+            children.add(new CategoryEntry("containers", containerChildren));
+
+            // 实验性 / 通用
             CATEGORIES.forEach((category, keys) ->
-            {
-                List<IConfigEntry> entries = keys.stream()
-                        .map(key -> (IConfigEntry) (INT_DEFAULTS.containsKey(key)
-                                ? new IntegerEntry(this.intValues.get(key))
-                                : LIST_DEFAULTS.containsKey(key)
-                                        ? new ListEntry(this.listValues.get(key))
-                                        : new BooleanEntry(this.values.get(key))))
-                        .toList();
-                children.add(new CategoryEntry(category, entries));
-            });
+                    children.add(new CategoryEntry(category, leafEntries(keys))));
+
             this.root = new RootEntry(children);
         }
         return this.root;
+    }
+
+    /** 把配置键列表转成对应的叶子配置项。 */
+    private List<IConfigEntry> leafEntries(List<String> keys)
+    {
+        return keys.stream()
+                .map(key -> (IConfigEntry) (INT_DEFAULTS.containsKey(key)
+                        ? new IntegerEntry(this.intValues.get(key))
+                        : LIST_DEFAULTS.containsKey(key)
+                                ? new ListEntry(this.listValues.get(key))
+                                : new BooleanEntry(this.values.get(key))))
+                .toList();
     }
 
     @Override

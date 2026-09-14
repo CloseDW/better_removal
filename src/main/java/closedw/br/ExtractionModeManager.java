@@ -127,11 +127,12 @@ public final class ExtractionModeManager {
 	}
 
 	/**
-	 * 主动探测是否可用：实验性总开关 + 主动探测开关都打开。
+	 * 主动探测是否可用：实验性总开关 + 主动探测开关（experimental_transfer_probe）都打开。
 	 * 未安装 Configured 时读不到开关，按不可用处理。
 	 */
 	public static boolean isProbeAvailable() {
-		return OutputSlotExtractor.isExperimentalEnabled() && OutputSlotExtractor.isTransferProbeEnabled();
+		return OutputSlotExtractor.isExperimentalEnabled()
+				&& OutputSlotExtractor.isContainerEnabled("experimental_transfer_probe");
 	}
 
 	/** 重新向客户端同步模式与"主动探测是否可用"（配置改完后由 /br reload 调用）。 */

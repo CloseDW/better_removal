@@ -64,6 +64,11 @@ public class ExtractionPreviewProvider implements IBlockComponentProvider {
 
 		ModeState state = ExtractionModeManager.getClientState();
 
+		// 主动探测模式：不涉及取出/放入，不显示预览
+		if (state.action() == ExtractionAction.PROBE) {
+			return;
+		}
+
 		// 放入模式：显示主手物品（无需服务端数据）
 		if (state.action() == ExtractionAction.DEPOSIT) {
 			ItemStack held = player.getMainHandStack();

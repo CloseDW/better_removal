@@ -5,7 +5,6 @@ import closedw.br.ExtractionMode;
 import closedw.br.ExtractionModeManager;
 import closedw.br.ModeState;
 import closedw.br.OutputSlotExtractor;
-import closedw.br.experimental.AutoDetectSupport;
 import closedw.br.experimental.SlotRules;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.CommandDispatcher;
@@ -78,8 +77,6 @@ public final class BetterRemovalCommand {
 				return 0;
 			}
 			int count = SlotRules.reload();
-			// 顺带清掉主动探测的缓存，让改完白名单/规则后能重新探测
-			AutoDetectSupport.clearCaches();
 			// 配置改完后重新同步一次：模式滚轮据此决定是否显示"主动探测"
 			ExtractionModeManager.refreshClient(player);
 			if (!OutputSlotExtractor.isExperimentalEnabled()) {

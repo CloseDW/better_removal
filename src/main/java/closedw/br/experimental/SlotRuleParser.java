@@ -140,24 +140,29 @@ final class SlotRuleParser {
 	}
 
 	/**
-	 * 解析槽位列表：字符串 {@code "*"} 返回 null（表示全部槽位），数组返回其中的槽位号。
+	 * 解析槽位列表：字符串 {@code "*"} 返回 null（表示全部槽位），数字返回单槽，数组返回其中的槽位号。
+	 * 其它形式（非 {@code "*"} 的字符串、布尔、null、非数组对象）都是非法声明，抛异常让调用方跳过整条规则
+	 * ——绝不能把非法值当成“全部槽位”。
 	 */
 	private static List<Integer> parseSlots(JsonElement element) {
 		if (element == null || element.isJsonNull()) {
-			return null;
+			throw new IllegalArgumentException("槽位值不能为空");
 		}
 		if (element.isJsonPrimitive()) {
 			JsonPrimitive primitive = element.getAsJsonPrimitive();
-			if (primitive.isString() && primitive.getAsString().trim().equals("*")) {
-				return null;
+			if (primitive.isString()) {
+				if (primitive.getAsString().trim().equals("*")) {
+					return null;
+				}
+				throw new IllegalArgumentException("无效的槽位值：" + primitive.getAsString());
 			}
 			if (primitive.isNumber()) {
 				return List.of(primitive.getAsInt());
 			}
-			return null;
+			throw new IllegalArgumentException("无效的槽位值：" + primitive);
 		}
 		if (!element.isJsonArray()) {
-			return null;
+			throw new IllegalArgumentException("无效的槽位值：" + element);
 		}
 		List<Integer> slots = new ArrayList<>();
 		for (JsonElement item : element.getAsJsonArray()) {

@@ -85,7 +85,7 @@ Fabric 1.20.1：按住 **左 Alt**（可改键）**右键**容器，直接把物
 
 ## 实验性：通用容器支持
 
-内置的逐模组支持之外，还有一条**实验性**路线，让*任意*容器都能用，而不必为每个模组写代码。
+内置的逐模组支持之外，还有一条**实验性**路线，让*任意*容器都能用。
 它**默认关闭**，由三部分组成：**声明式槽位规则**、**自动探测**，
 以及帮你生成规则的**主动探测模式**。
 
@@ -98,15 +98,13 @@ Fabric 1.20.1：按住 **左 Alt**（可改键）**右键**容器，直接把物
 
 ### 1. 声明式槽位规则
 
-规则直接说明容器的每个槽位是什么，不需要任何猜测。规则有三个来源，优先级从高到低：
+规则直接说明容器的每个槽位是什么。规则有三个来源，优先级从高到低：
 
-1. Configured 里的 `容器槽位规则` —— 一行一条，游戏内就能改；
+1. Configured 里的 `容器槽位规则` —— 一行一条；
 2. `config/better-removal/containers/*.json` ；
 3. 模组 jar 里的 `better-removal/containers/*.json` 。
 
-三种来源都用同一套匹配语法，且忽略大小写：`模组ID:方块ID` 匹配单个方块。
-
-Configured 的写法：`<匹配串> <角色>=<槽位> ...`，槽位用逗号分隔，`*` 表示所有槽位：
+Configured 的写法：槽位用逗号分隔，`*` 表示所有槽位：
 
 ```
 ironfurnaces input=0 fuel=1 output=2
@@ -124,46 +122,43 @@ JSON 文件写法（一条规则的 `match` 用逗号分隔即可同时匹配多
 }
 ```
 
-角色有 `input`、`fuel`、`output` 和 `ignore`（等同 `none`）。
+角色有 `input`、`fuel`、`output` 和 `ignore`。
 后面的赋值覆盖前面的，所以 `"output": "*", "input": [1]` 表示"除了 1 号槽，其它都是输出槽"。
-超出范围的槽位编号会被忽略；写错的规则会被跳过。
+超出范围的槽位编号会被忽略；写错的规则会被跳过。`/br reload` 会重新读取所有规则文件与 Configured 列表。
 
-规则**不需要**白名单，但仍受总开关约束。模组内置了一条
-**Iron Furnaces** 的规则（`better-removal/containers/iron_furnaces.json`：输入 `0`、燃料 `1`、
-输出 `2`，其余忽略），所以只要打开实验性开关，这个模组就整组可用。`/br reload` 会重新读取所有规则文件与 Configured 列表。
+首次运行会在 `config/better-removal/containers/` 下生成一个 `example.json` 示例模板。
 
 ### 2. 自动探测（兜底猜测）
 
-只有列在**白名单**里的方块会被自动探测，写法与规则匹配串完全一致，。
+只有列在**白名单**里的方块会被自动探测。
 
-三个探测后端依次执行：
+两个探测后端依次执行：
 
 1. **菜单只读。** 构造容器自己的菜单，读取模组作者写下的声明（能否放入 / 能否取出 / 槽位是否显示 /
    堆叠上限）。
-2. **主动搬运（可选，需要 `主动探测模式`）。** shift 点击槽位是由菜单自己的 `quickMove` 实现的，这一步把探测物放进菜单的
-   *一次性*玩家背包、跑一次 `quickMove`，然后看它落进了哪个容器槽。这样能直接读出模组自己的逻辑，
-   对那些 `isValid` 一律回答"是"的机器同样有效。
-3. **原版容器接口。** 兜底方案，只用几件常见物品问 `Inventory.isValid`，并检查 `SidedInventory.canExtract`。
+2. **原版容器接口。** 兜底方案，只用几件常见物品问 `Inventory.isValid`，并检查 `SidedInventory.canExtract`。
 
-结果（以及用的是哪个后端，例如 `menu`、`menu+transfer`、`inventory`）会打印到日志：
+结果（以及用的是哪个后端，例如 `menu`、`inventory`）会打印到日志：
 `[auto-detect] <方块> -> 0=INPUT 1=FUEL 2=OUTPUT ...`，可以先确认它判断得对不对再决定要不要用。
-如果某台机器被探测时出问题，就把 `主动探测模式` 关掉。
 
 ### 3. 主动探测模式（快速手写一条规则）
 
 打开 `主动探测模式` 后，模式滚轮会多出一项：**主动探测**。在这个模式下按住修饰键右键任意容器，
-服务端会把上面三个探测后端各跑一次，然后把结果打印到聊天框，每个后端一行规则 JSON，复制即用：
+服务端会把上面两个探测后端各跑一次，每个后端输出两行 —— **JSON** 和 **规则**（即 Configured 的
+`容器槽位规则` 格式）：
 
 ```
 主动探测：somemod:crusher
-① 菜单只读: {"match":"somemod:crusher","input":[0,1],"fuel":[2],"output":[3]}
-② 主动搬运: {"match":"somemod:crusher","input":[0],"fuel":[2]}
-③ 库存接口: {"match":"somemod:crusher","output":[3,4]}
+① 菜单只读
+  JSON: {"match":"somemod:crusher","input":[0,1],"fuel":[2],"output":[3]}
+  规则: somemod:crusher input=0,1 fuel=2 output=3
+② 库存接口
+  JSON: {"match":"somemod:crusher","output":[3,4]}
+  规则: somemod:crusher output=3,4
 ```
 
-挑看起来正确的那一行，粘进 `config/better-removal/containers/` 下的 json（或 Configured 的
-`容器槽位规则` 列表），`/br reload` 后生效。如果某个后端什么都判断不出来，那一行会显示 `无法探测`。
-探测不写任何文件，容器也会保持原样。
+把 JSON 行粘进 `config/better-removal/containers/` 下的 json，或把规则行粘进 Configured 的
+`容器槽位规则` 列表，`/br reload` 后生效。如果某个后端什么都判断不出来，那一行会显示 `无法探测`。
 
 ### 4. 范围与限制
 

@@ -40,6 +40,23 @@ public final class SlotRules {
 	/** Configured 中的规则列表键。 */
 	private static final String CONFIG_KEY = "experimental_slot_rules";
 
+	/** 用户目录缺省生成的示例文件（仅当文件不存在时写入，之后永不覆盖）。 */
+	private static final String EXAMPLE_FILE = "example.json";
+	private static final String EXAMPLE_CONTENT = """
+			{
+			  "_comment": "示例模板，不会生效：它匹配一个不存在的方块，仅用于展示格式，可照抄改写成自己的规则。",
+			  "containers": [
+			    {
+			      "match": "examplemod:example_block",
+			      "input": [0, 1],
+			      "fuel": [2],
+			      "output": [3, 4],
+			      "ignore": [5]
+			    }
+			  ]
+			}
+			""";
+
 	private static final Logger LOGGER = BetterRemoval.LOGGER;
 
 	/** 文件来源的规则（启动时或 /br reload 时读取一次）。 */
@@ -195,7 +212,26 @@ public final class SlotRules {
 		catch (IOException e) {
 			LOGGER.warn("[auto-detect] 无法创建槽位规则目录 {}: {}", directory, e.toString());
 		}
+		writeExampleIfMissing(directory);
 		readDirectory(directory, "config/" + CONFIG_DIR, out);
+	}
+
+	/**
+	 * 目录里没有示例文件时写入一份模板（match 是不存在的方块，永远不生效）。
+	 * 只生成一次：文件已存在就绝不覆盖，避免冲掉玩家的改动。
+	 */
+	private static void writeExampleIfMissing(Path directory) {
+		Path example = directory.resolve(EXAMPLE_FILE);
+		try {
+			if (Files.exists(example)) {
+				return;
+			}
+			Files.writeString(example, EXAMPLE_CONTENT, StandardCharsets.UTF_8);
+			LOGGER.info("[auto-detect] 已生成示例槽位规则 {}", example);
+		}
+		catch (IOException e) {
+			LOGGER.warn("[auto-detect] 无法生成示例槽位规则 {}: {}", example, e.toString());
+		}
 	}
 
 	private static void readDirectory(Path directory, String source, List<SlotRule> out) {

@@ -119,14 +119,6 @@ public final class OutputSlotExtractor {
 	}
 
 	/**
-	 * 实验性：是否允许用 quickMove（模拟 shift 点击）主动探测槽位，默认开启。
-	 * 只在实验性总开关已打开、且容器命中白名单时才会被用到；探测物会立刻还原。
-	 */
-	public static boolean isTransferProbeEnabled() {
-		return isContainerEnabled("experimental_transfer_probe");
-	}
-
-	/**
 	 * 修饰键是否按住：左Alt（可改键）。
 	 */
 	public static boolean isModifierHeld(PlayerEntity player) {
@@ -539,7 +531,7 @@ public final class OutputSlotExtractor {
 
 		ModeState state = ExtractionModeManager.getState(player);
 
-		// ---------- 主动探测（实验性）：三次槽位探测的结果打印到聊天框，不动容器 ----------
+		// ---------- 主动探测（实验性）：槽位探测的结果打印到聊天框，不动容器 ----------
 		if (state.action() == ExtractionAction.PROBE) {
 			if (!ExtractionModeManager.isProbeAvailable()) {
 				// 开关关掉后玩家可能还停在"主动探测"模式
