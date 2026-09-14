@@ -3,6 +3,7 @@ package com.better_removal;
 import com.better_removal.networking.BetterRemovalNetwork;
 import com.better_removal.networking.ExtractionModeSyncPacket;
 import com.mojang.logging.LogUtils;
+import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerPlayer;
@@ -22,8 +23,9 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 按玩家记录取出模式，并持久化到配置文件（服务器重启后仍保留）。
- * 配置文件位于 config/better-removal-modes.properties，键为玩家UUID，值为模式名。
+ * 按玩家记录交互模式（行为=取出/放入/补货 + 槽位），并持久化到配置文件（服务器重启后仍保留）。
+ * 配置文件位于 config/better-removal-modes.properties，键为玩家UUID，值为"ACTION:MODE"。
+ * 兼容旧格式（仅槽位名，视为取出行为）。
  */
 public final class ExtractionModeManager {
 
@@ -31,10 +33,13 @@ public final class ExtractionModeManager {
 	private static final String FILE_NAME = "better-removal-modes.properties";
 
 	private static final Path PATH = FMLPaths.CONFIGDIR.get().resolve(FILE_NAME);
-	private static final Map<UUID, ExtractionMode> MODES = new ConcurrentHashMap<>();
+	private static final Map<UUID, ModeState> STATES = new ConcurrentHashMap<>();
 
 	/** 客户端缓存的当前模式（由服务端通过 S2C 包同步） */
-	private static volatile ExtractionMode CLIENT_MODE = ExtractionMode.OUTPUT;
+	private static volatile ModeState CLIENT_STATE = ModeState.DEFAULT;
+
+	/** 客户端缓存的"主动探测是否可用"（由服务端通过 S2C 包同步），模式滚轮据此决定是否多显示一个预设 */
+	private static volatile boolean CLIENT_PROBE_AVAILABLE = false;
 
 	static {
 		load();
@@ -54,22 +59,41 @@ public final class ExtractionModeManager {
 			}
 		}
 		props.forEach((key, value) -> {
-			try {
-				MODES.put(UUID.fromString((String) key), ExtractionMode.valueOf((String) value));
-			}
-			catch (Exception e) {
+			ModeState state = parseState((String) value);
+			if (state == null) {
 				LOGGER.warn("Skipping invalid extraction mode entry: {}={}", key, value);
+				return;
+			}
+			try {
+				STATES.put(UUID.fromString((String) key), state);
+			}
+			catch (IllegalArgumentException e) {
+				LOGGER.warn("Skipping extraction mode entry with invalid player UUID: {}={}", key, value);
 			}
 		});
 	}
 
+	/** 解析"ACTION:MODE"，兼容旧格式（仅槽位名 = 取出行为） */
+	private static ModeState parseState(String value) {
+		try {
+			int split = value.indexOf(':');
+			if (split >= 0) {
+				return new ModeState(ExtractionAction.valueOf(value.substring(0, split)), ExtractionMode.valueOf(value.substring(split + 1)));
+			}
+			return new ModeState(ExtractionAction.EXTRACT, ExtractionMode.valueOf(value));
+		}
+		catch (Exception e) {
+			return null;
+		}
+	}
+
 	private static void save() {
 		Properties props = new Properties();
-		MODES.forEach((uuid, mode) -> props.setProperty(uuid.toString(), mode.name()));
+		STATES.forEach((uuid, state) -> props.setProperty(uuid.toString(), state.action().name() + ":" + state.mode().name()));
 		try {
 			Files.createDirectories(PATH.getParent());
 			try (OutputStream out = Files.newOutputStream(PATH)) {
-				props.store(out, "Better Removal per-player extraction modes");
+				props.store(out, "Better Removal per-player modes");
 			}
 		}
 		catch (IOException e) {
@@ -77,48 +101,83 @@ public final class ExtractionModeManager {
 		}
 	}
 
-	public static ExtractionMode getMode(Player player) {
-		return MODES.getOrDefault(player.getUUID(), ExtractionMode.OUTPUT);
+	public static ModeState getState(Player player) {
+		return STATES.getOrDefault(player.getUUID(), ModeState.DEFAULT);
+	}
+
+	/** 客户端缓存的当前模式（供 Jade客户端功能读取）。 */
+	public static ModeState getClientState() {
+		return CLIENT_STATE;
+	}
+
+	public static void setClientState(ModeState state) {
+		CLIENT_STATE = state;
+	}
+
+	/** 客户端缓存的"主动探测是否可用"（供模式滚轮读取）。 */
+	public static boolean isClientProbeAvailable() {
+		return CLIENT_PROBE_AVAILABLE;
+	}
+
+	public static void setClientState(ModeState state, boolean probeAvailable) {
+		CLIENT_STATE = state;
+		CLIENT_PROBE_AVAILABLE = probeAvailable;
 	}
 
 	/**
-	 * 客户端缓存的当前模式（供 Jade 联动等客户端功能读取）。
+	 * 主动探测是否可用：实验性总开关 + 主动探测开关（experimental_transfer_probe）都打开。
+	 * 未安装 Configured 时读不到开关，按不可用处理。
 	 */
-	public static ExtractionMode getClientMode() {
-		return CLIENT_MODE;
+	public static boolean isProbeAvailable() {
+		return OutputSlotExtractor.isExperimentalEnabled()
+				&& OutputSlotExtractor.isContainerEnabled("experimental_transfer_probe");
 	}
 
-	public static void setClientMode(ExtractionMode mode) {
-		CLIENT_MODE = mode;
+	/** 重新向客户端同步模式与"主动探测是否可用"（配置改完后由 /br reload 调用）。 */
+	public static void refreshClient(ServerPlayer player) {
+		BetterRemovalNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
+				new ExtractionModeSyncPacket(getState(player), isProbeAvailable()));
 	}
 
-	public static void setMode(ServerPlayer player, ExtractionMode mode) {
-		MODES.put(player.getUUID(), mode);
+	/** 防御非法组合：放入预设只允许 input/fuel；补货固定全部；主动探测不使用槽位模式 */
+	private static ModeState sanitize(ModeState state) {
+		if (state.action() == ExtractionAction.PROBE) {
+			return new ModeState(ExtractionAction.PROBE, ExtractionMode.ALL);
+		}
+		if (state.action() == ExtractionAction.DEPOSIT && state.mode() != ExtractionMode.INPUT && state.mode() != ExtractionMode.FUEL) {
+			return new ModeState(ExtractionAction.DEPOSIT, ExtractionMode.INPUT);
+		}
+		if (state.action() == ExtractionAction.RESTOCK && state.mode() != ExtractionMode.ALL) {
+			return new ModeState(ExtractionAction.RESTOCK, ExtractionMode.ALL);
+		}
+		return state;
+	}
+
+	public static ModeState setState(ServerPlayer player, ModeState state) {
+		state = sanitize(state);
+		STATES.put(player.getUUID(), state);
 		save();
-		BetterRemovalNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new ExtractionModeSyncPacket(mode));
+		BetterRemovalNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
+				new ExtractionModeSyncPacket(state, isProbeAvailable()));
+		return state;
 	}
 
 	/**
-	 * 生成切换提示文本，如：当前取出模式【取出输入槽】
-	 * 前缀与括号用一种颜色，模式名用另一种高亮颜色。
-	 * 使用 translatable 组件，客户端按各自语言解析。
+	 * 生成模式提示文本，如：当前模式【取出 · 输出槽】；补货没有槽位预设，只显示行为名
 	 */
-	public static Component getModeMessage(ExtractionMode mode) {
-		MutableComponent prefix = Component.translatable("better_removal.message.mode_prefix").withStyle(net.minecraft.ChatFormatting.YELLOW);
-		MutableComponent open = Component.literal("【").withStyle(net.minecraft.ChatFormatting.AQUA);
-		MutableComponent name = Component.translatable(mode.getTranslationKey()).withStyle(mode.getAccentColor());
-		MutableComponent close = Component.literal("】").withStyle(net.minecraft.ChatFormatting.AQUA);
-		return prefix.append(open).append(name).append(close);
-	}
-
-	/**
-	 * 生成 /br now 提示：当前取出模式
-	 */
-	public static Component getCurrentModeMessage(ExtractionMode mode) {
-		MutableComponent prefix = Component.translatable("better_removal.message.current_mode_prefix").withStyle(net.minecraft.ChatFormatting.GRAY);
-		MutableComponent open = Component.literal("【").withStyle(net.minecraft.ChatFormatting.AQUA);
-		MutableComponent name = Component.translatable(mode.getTranslationKey()).withStyle(mode.getAccentColor());
-		MutableComponent close = Component.literal("】").withStyle(net.minecraft.ChatFormatting.AQUA);
-		return prefix.append(open).append(name).append(close);
+	public static Component getStateMessage(ModeState state) {
+		MutableComponent prefix = Component.translatable("better_removal.message.state_prefix")
+				.withStyle(ChatFormatting.YELLOW);
+		MutableComponent open = Component.literal("【").withStyle(ChatFormatting.AQUA);
+		MutableComponent action = Component.translatable(state.action().getTranslationKey())
+				.withStyle(state.action().getAccentColor());
+		if (!state.action().hasSlotMode()) {
+			return prefix.append(open).append(action)
+					.append(Component.literal("】").withStyle(ChatFormatting.AQUA));
+		}		MutableComponent middle = Component.literal(" · ").withStyle(ChatFormatting.AQUA);
+		MutableComponent slot = Component.translatable(state.mode().getTranslationKey())
+				.withStyle(state.mode().getAccentColor());
+		MutableComponent close = Component.literal("】").withStyle(ChatFormatting.AQUA);
+		return prefix.append(open).append(action).append(middle).append(slot).append(close);
 	}
 }

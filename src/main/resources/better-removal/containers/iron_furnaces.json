@@ -1,0 +1,11 @@
+{
+  "containers": [
+    {
+      "match": "ironfurnaces:copper_furnace,ironfurnaces:iron_furnace,ironfurnaces:silver_furnace,ironfurnaces:gold_furnace,ironfurnaces:diamond_furnace,ironfurnaces:emerald_furnace,ironfurnaces:obsidian_furnace,ironfurnaces:crystal_furnace,ironfurnaces:netherite_furnace,ironfurnaces:allthemodium_furnace,ironfurnaces:vibranium_furnace,ironfurnaces:unobtainium_furnace,ironfurnaces:million_furnace",
+      "input": [0],
+      "fuel": [1],
+      "output": [2],
+      "ignore": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+    }
+  ]
+}

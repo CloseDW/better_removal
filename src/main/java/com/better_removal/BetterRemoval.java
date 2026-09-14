@@ -1,6 +1,7 @@
 package com.better_removal;
 
 import com.better_removal.command.BetterRemovalCommand;
+import com.better_removal.experimental.SlotRules;
 import com.better_removal.networking.BetterRemovalNetwork;
 import com.mojang.logging.LogUtils;
 import net.minecraft.server.level.ServerPlayer;
@@ -36,6 +37,8 @@ public class BetterRemoval
     private void commonSetup(final FMLCommonSetupEvent event)
     {
         LOGGER.info("Loading Better Removal (Forge)");
+        // 实验性：读取手写槽位规则（内置 / 其它模组自声明 / 用户配置文件）
+        SlotRules.load();
     }
 
     @SubscribeEvent
@@ -58,8 +61,8 @@ public class BetterRemoval
     {
         if (event.getEntity() instanceof ServerPlayer player)
         {
-            // 进服时同步当前取出模式到客户端（供 Jade 预览）
-            ExtractionModeManager.setMode(player, ExtractionModeManager.getMode(player));
+            // 进服时同步当前模式（行为+槽位）到客户端（供 Jade 预览）
+            ExtractionModeManager.setState(player, ExtractionModeManager.getState(player));
         }
     }
 }

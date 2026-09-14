@@ -123,6 +123,39 @@ public final class FarmersDelightSupport {
 	}
 
 	/**
+	 * 向厨锅指定槽位放入物品（ItemStackHandler#insertItem，自动同类堆叠合并）。
+	 * @param simulate true时只模拟不修改
+	 * @return 实际放入的数量；0表示没有放入
+	 */
+	public static int insertToSlot(Level level, BlockPos pos, BlockEntity blockEntity, int slot, ItemStack stack, boolean simulate) {
+		if (!LOADED || blockEntity == null || stack == null || stack.isEmpty()) {
+			return 0;
+		}
+		try {
+			Class<?> clazz = Class.forName(COOKING_POT_CLASS);
+			if (!clazz.isInstance(blockEntity)) {
+				return 0;
+			}
+			Object inventory = clazz.getMethod("getInventory").invoke(blockEntity);
+			if (inventory == null) {
+				return 0;
+			}
+			// 必须传副本ItemStackHandler空槽插入时会把传入的堆叠实例直接存进槽位，
+			// 若传入玩家手上真堆叠，后续held.decrement会把厨锅槽位一起减空（物品凭空消失）
+			ItemStack probe = stack.copy();
+			Object resultObj = inventory.getClass()
+					.getMethod("insertItem", int.class, ItemStack.class, boolean.class)
+					.invoke(inventory, slot, probe, simulate);
+			ItemStack remainder = (ItemStack) resultObj;
+			int leftover = (remainder == null || remainder.isEmpty()) ? 0 : remainder.getCount();
+			return Math.max(0, stack.getCount() - leftover);
+		}
+		catch (Throwable t) {
+			return 0;
+		}
+	}
+
+	/**
 	 * 把厨锅任意槽位的物品减少count
 	 */
 	public static void removeFromSlot(Level level, BlockPos pos, BlockEntity blockEntity, int slot, int count) {

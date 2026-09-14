@@ -22,10 +22,10 @@ public final class BetterRemovalNetwork {
 	}
 
 	public static void register() {
-		CHANNEL.messageBuilder(ExtractionModeCyclePacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
-				.encoder(ExtractionModeCyclePacket::encode)
-				.decoder(ExtractionModeCyclePacket::new)
-				.consumerMainThread(ExtractionModeCyclePacket::handle)
+		CHANNEL.messageBuilder(ExtractionModeSetPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+				.encoder(ExtractionModeSetPacket::encode)
+				.decoder(ExtractionModeSetPacket::new)
+				.consumerMainThread(ExtractionModeSetPacket::handle)
 				.add();
 
 		CHANNEL.messageBuilder(AltKeyStatePacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
