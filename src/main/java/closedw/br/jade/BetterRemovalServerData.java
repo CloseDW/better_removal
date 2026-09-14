@@ -1,7 +1,8 @@
 package closedw.br.jade;
 
-import closedw.br.ExtractionMode;
+import closedw.br.ExtractionAction;
 import closedw.br.ExtractionModeManager;
+import closedw.br.ModeState;
 import closedw.br.OutputSlotExtractor;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -14,9 +15,7 @@ import snownee.jade.api.IServerDataProvider;
 import java.util.List;
 
 /**
- * Jade 服务端数据提供器：把当前模式下将要取出的真实物品下发给客户端。
- * 解决部分容器（原版/Aether/Fossil/Vinery等）不把库存同步到客户端方块实体，
- * 导致客户端本地无法读取物品的问题。
+ * Jade服务端数据提供器：把当前模式下将要取出/补货的真实物品下发给客户端。
  */
 public class BetterRemovalServerData implements IServerDataProvider<BlockAccessor> {
 
@@ -35,9 +34,22 @@ public class BetterRemovalServerData implements IServerDataProvider<BlockAccesso
         if (accessor.getBlockEntity() == null) {
             return;
         }
+        // 客户端只在按住修饰键时显示预览，服务端同样仅在修饰键按下时计算并下发数据
+        if (!OutputSlotExtractor.isModifierHeld(player)) {
+            return;
+        }
 
-        ExtractionMode mode = ExtractionModeManager.getMode(player);
-        List<ItemStack> items = OutputSlotExtractor.collectPreview(player, accessor.getBlockEntity(), mode);
+        ModeState state = ExtractionModeManager.getState(player);
+        List<ItemStack> items;
+        if (state.action() == ExtractionAction.EXTRACT) {
+            items = OutputSlotExtractor.collectPreview(player, accessor.getBlockEntity(), state.mode());
+        }
+        else if (state.action() == ExtractionAction.RESTOCK) {
+            items = OutputSlotExtractor.collectRestockPreview(accessor.getBlockEntity(), player);
+        }
+        else {
+            return;
+        }
         if (items == null || items.isEmpty()) {
             return;
         }

@@ -1,6 +1,7 @@
 package closedw.br;
 
 import closedw.br.command.BetterRemovalCommand;
+import closedw.br.experimental.SlotRules;
 import closedw.br.networking.NetworkHandler;
 import com.mojang.logging.LogUtils;
 import net.minecraft.resources.ResourceLocation;
@@ -36,6 +37,8 @@ public class BetterRemoval {
 
     private void commonSetup(FMLCommonSetupEvent event) {
         LOGGER.info("Loading Better Removal (NeoForge)");
+        // 实验性：读取手写槽位规则（内置 / 其它模组自声明 / 用户配置文件）
+        SlotRules.load();
     }
 
     @SubscribeEvent
@@ -46,8 +49,8 @@ public class BetterRemoval {
     @SubscribeEvent
     public void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
-            // 进服时同步当前取出模式到客户端（供 Jade 预览）
-            ExtractionModeManager.setMode(player, ExtractionModeManager.getMode(player));
+            // 进服时同步当前模式到客户端（供 Jade 预览）
+            ExtractionModeManager.setState(player, ExtractionModeManager.getState(player));
         }
     }
 

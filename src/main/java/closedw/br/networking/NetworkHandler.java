@@ -1,9 +1,8 @@
 package closedw.br.networking;
 
-import closedw.br.BetterRemoval;
 import closedw.br.CarryOnCompat;
-import closedw.br.ExtractionMode;
 import closedw.br.ExtractionModeManager;
+import closedw.br.ModeState;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
@@ -19,12 +18,11 @@ public final class NetworkHandler {
     public static void registerPayloads(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar("1");
 
-        registrar.playToServer(ExtractionModeCyclePayload.TYPE, ExtractionModeCyclePayload.CODEC, (payload, context) -> {
+        registrar.playToServer(ExtractionModeSetPayload.TYPE, ExtractionModeSetPayload.CODEC, (payload, context) -> {
             context.enqueueWork(() -> {
                 if (context.player() instanceof ServerPlayer player) {
-                    ExtractionMode next = ExtractionModeManager.getMode(player).next();
-                    ExtractionModeManager.setMode(player, next);
-                    player.displayClientMessage(ExtractionModeManager.getModeMessage(next), false);
+                    ModeState state = ExtractionModeManager.setState(player, new ModeState(payload.action(), payload.mode()));
+                    player.displayClientMessage(ExtractionModeManager.getStateMessage(state), false);
                 }
             });
         });
@@ -38,7 +36,8 @@ public final class NetworkHandler {
         });
 
         registrar.playToClient(ExtractionModeSyncPayload.TYPE, ExtractionModeSyncPayload.CODEC, (payload, context) -> {
-            context.enqueueWork(() -> ExtractionModeManager.setClientMode(payload.mode()));
+            context.enqueueWork(() -> ExtractionModeManager.setClientState(
+                    new ModeState(payload.action(), payload.mode()), payload.probeAvailable()));
         });
     }
 }

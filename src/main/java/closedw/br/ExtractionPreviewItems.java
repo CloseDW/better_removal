@@ -1,5 +1,6 @@
 package closedw.br;
 
+import closedw.br.cookingforblockheads.CookingForBlockheadsSupport;
 import closedw.br.farmersdelight.FarmersDelightSupport;
 import net.minecraft.world.Container;
 import net.minecraft.world.item.ItemStack;
@@ -46,6 +47,29 @@ public final class ExtractionPreviewItems {
             return items;
         }
 
+        // 烤炉：反射拿内部容器（不是Container）
+        if (CookingForBlockheadsSupport.isOven(blockEntity)) {
+            if (!OutputSlotExtractor.isContainerEnabled("oven") || CookingForBlockheadsSupport.isAutomationDisallowed()) {
+                return null;
+            }
+            int[] slots = OutputSlotExtractor.getSlotsForMode(blockEntity, mode);
+            Container ovenContainer = CookingForBlockheadsSupport.getInternalContainer(blockEntity);
+            if (slots == null || ovenContainer == null) {
+                return null;
+            }
+            List<ItemStack> items = new ArrayList<>();
+            for (int slot : slots) {
+                if (slot < 0 || slot >= ovenContainer.getContainerSize()) {
+                    continue;
+                }
+                ItemStack stack = ovenContainer.getItem(slot);
+                if (!stack.isEmpty()) {
+                    items.add(stack);
+                }
+            }
+            return items;
+        }
+
         int[] slots = OutputSlotExtractor.getSlotsForMode(blockEntity, mode);
         if (slots == null) {
             return null;
@@ -56,7 +80,6 @@ public final class ExtractionPreviewItems {
 
         List<ItemStack> items = new ArrayList<>();
         for (int slot : slots) {
-            // 越界保护：模组更新可能改变槽位布局，getItem越界会抛异常
             if (slot < 0 || slot >= container.getContainerSize()) {
                 continue;
             }
