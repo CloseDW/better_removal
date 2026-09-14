@@ -85,12 +85,12 @@ Beyond the built-in per-mod support there is an **experimental** path that makes
 usable without per-mod code. It is **off by default** and has three parts: **declared slot rules**,
 **auto-detection**, and the **active probe mode** that writes you a rule to copy.
 
-| Option (Configured) | Default | Meaning |
-| --- | --- | --- |
-| `Auto-detect containers (Experimental)` | off | Master switch for the whole feature |
-| `Auto-detect whitelist` | empty | Only the blocks listed here are auto-detected |
-| `Active probe mode (Experimental)` | off | Adds an *Active Probe* entry to the mode wheel |
-| `Container slot rules` | empty | Hand-written slot maps, one rule per line |
+| Option (Configured) | Default | Meaning                                                         |
+| --- | --- |-----------------------------------------------------------------|
+| `Auto-detect containers (Experimental)` | off | Master switch for the whole feature                             |
+| `Auto-detect whitelist` | empty | Only the blocks listed here are auto-detected (mod_id:block_id) |
+| `Active probe mode (Experimental)` | off | Adds an *Active Probe* entry to the mode wheel                  |
+| `Container slot rules` | empty | Hand-written slot maps, one rule per line                       |
 
 ### 1. Declared slot rules
 
