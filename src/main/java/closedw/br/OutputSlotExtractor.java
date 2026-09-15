@@ -140,9 +140,11 @@ public final class OutputSlotExtractor {
 
 		// ALL受容器开关约束，不允许绕过配置。
 		// 未知容器（实验性自动探测）不在此返回，改由方法末尾的兜底分支处理。
-		if (mode == ExtractionMode.ALL && getConfigKey(blockEntity) != null) {
-			String key = getConfigKey(blockEntity);
-			return isContainerEnabled(key) ? allSlots(blockEntity) : null;
+		if (mode == ExtractionMode.ALL) {
+			String allKey = getConfigKey(blockEntity);
+			if (allKey != null) {
+				return isContainerEnabled(allKey) ? allSlots(blockEntity) : null;
+			}
 		}
 
 		// ---------- 原版 ----------
@@ -169,10 +171,12 @@ public final class OutputSlotExtractor {
 		}
 
 		// 没有单独输入/燃料槽的容器，三种模式都取全部
+		// 注意：DropperBlockEntity 继承自 DispenserBlockEntity，发射器分支必须排除投掷器，
 		if (blockEntity instanceof DropperBlockEntity && isContainerEnabled("dropper")) {
 			return allSlots(blockEntity);
 		}
-		if (blockEntity instanceof DispenserBlockEntity && isContainerEnabled("dispenser")) {
+		if (blockEntity instanceof DispenserBlockEntity && !(blockEntity instanceof DropperBlockEntity)
+				&& isContainerEnabled("dispenser")) {
 			return allSlots(blockEntity);
 		}
 		if (blockEntity instanceof HopperBlockEntity && isContainerEnabled("hopper")) {
@@ -184,31 +188,32 @@ public final class OutputSlotExtractor {
 		}
 
 		// ---------- Ad Astra ----------
+		// 下面这些机器都没有燃料槽：FUEL 预设无槽位可取（返回 null 交给上层 PASS），不能退回输出槽
 		// 压缩机：0电 1输入 2输出
 		if (CompressorSupport.isCompressor(blockEntity) && isContainerEnabled("compressor")) {
-			return mode == ExtractionMode.INPUT ? new int[] { 1 } : new int[] { 2 };
+			return withoutFuelSlots(blockEntity, mode, new int[] { 1 }, new int[] { 2 });
 		}
 		// 电力高炉：0电 1-4输入 5-8输出
 		if (EtrionicBlastFurnaceSupport.isEtrionicBlastFurnace(blockEntity) && isContainerEnabled("etrionic_blast_furnace")) {
-			return mode == ExtractionMode.INPUT ? new int[] { 1, 2, 3, 4 } : new int[] { 5, 6, 7, 8 };
+			return withoutFuelSlots(blockEntity, mode, new int[] { 1, 2, 3, 4 }, new int[] { 5, 6, 7, 8 });
 		}
 		// 燃料精炼机：0电 1输入(原油) 2输出(空桶) 3流体输入 4输出(满桶)
 		if (FuelRefinerySupport.isFuelRefinery(blockEntity) && isContainerEnabled("fuel_refinery")) {
-			return mode == ExtractionMode.INPUT ? new int[] { 1, 3 } : new int[] { 2, 4 };
+			return withoutFuelSlots(blockEntity, mode, new int[] { 1, 3 }, new int[] { 2, 4 });
 		}
 		// 氧气装载机：0电池 1输入(水桶) 2输出(空桶) 3流体输入 4输出
 		if (OxygenLoaderSupport.isOxygenLoader(blockEntity) && isContainerEnabled("oxygen_loader")) {
-			return mode == ExtractionMode.INPUT ? new int[] { 1, 3 } : new int[] { 2, 4 };
+			return withoutFuelSlots(blockEntity, mode, new int[] { 1, 3 }, new int[] { 2, 4 });
 		}
 		// 低温冷冻机：0电 1输入 2流体输入 3输出
 		if (CryoFreezerSupport.isCryoFreezer(blockEntity) && isContainerEnabled("cryo_freezer")) {
-			return mode == ExtractionMode.INPUT ? new int[] { 1, 2 } : new int[] { 3 };
+			return withoutFuelSlots(blockEntity, mode, new int[] { 1, 2 }, new int[] { 3 });
 		}
 
 		// ---------- Crabber's Delight ----------
 		// 捕蟹笼：0诱饵 1-9捕获物
 		if (CrabTrapSupport.isCrabTrap(blockEntity) && isContainerEnabled("crab_trap")) {
-			return mode == ExtractionMode.INPUT ? new int[] { 0 } : new int[] { 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+			return withoutFuelSlots(blockEntity, mode, new int[] { 0 }, new int[] { 1, 2, 3, 4, 5, 6, 7, 8, 9 });
 		}
 
 		// ---------- The Aether ----------
@@ -241,15 +246,12 @@ public final class OutputSlotExtractor {
 		// ---------- Fossils and Archeology: Revival ----------
 		// 分析仪：0-8输入 9-12输出
 		if (AnalyzerSupport.isAnalyzer(blockEntity) && isContainerEnabled("analyzer")) {
-			return mode == ExtractionMode.OUTPUT ? new int[] { 9, 10, 11, 12 }
-					: mode == ExtractionMode.INPUT ? new int[] { 0, 1, 2, 3, 4, 5, 6, 7, 8 }
-					: new int[] { 9, 10, 11, 12 };
+			return withoutFuelSlots(blockEntity, mode,
+					new int[] { 0, 1, 2, 3, 4, 5, 6, 7, 8 }, new int[] { 9, 10, 11, 12 });
 		}
 		// 筛子：0输入 1-5输出
 		if (SifterSupport.isSifter(blockEntity) && isContainerEnabled("sifter")) {
-			return mode == ExtractionMode.OUTPUT ? new int[] { 1, 2, 3, 4, 5 }
-					: mode == ExtractionMode.INPUT ? new int[] { 0 }
-					: new int[] { 1, 2, 3, 4, 5 };
+			return withoutFuelSlots(blockEntity, mode, new int[] { 0 }, new int[] { 1, 2, 3, 4, 5 });
 		}
 		// 培养槽：0输入 1燃料 2输出
 		if (CultureVatSupport.isCultureVat(blockEntity) && isContainerEnabled("culture_vat")) {
@@ -395,6 +397,20 @@ public final class OutputSlotExtractor {
 	}
 
 	/**
+	 * 没有燃料槽的容器（Ad Astra 各机器、捕蟹笼、分析仪、筛子）的槽位选择：
+	 * OUTPUT=产物槽，INPUT=输入槽，FUEL=没有对应槽位（返回 null，让调用方走 PASS）。
+	 * ALL 正常情况下走不到（{@link #getSlotsForMode} 顶部已统一处理）。
+	 */
+	private static int[] withoutFuelSlots(BlockEntity blockEntity, ExtractionMode mode, int[] input, int[] output) {
+		return switch (mode) {
+			case OUTPUT -> output;
+			case INPUT -> input;
+			case FUEL -> null;
+			case ALL -> allSlots(blockEntity);
+		};
+	}
+
+	/**
 	 * FTB Ultimine连锁（取出/放入共用）的容器位置列表。
 	 * 条件：配置开启 + 按住Ultimine键 + Ultimine存在缓存的连锁形状。
 	 * 点击的容器保证在列表中；数量受ftb_ultimine_max_containers限制。
@@ -412,17 +428,16 @@ public final class OutputSlotExtractor {
 		if (max <= 0) {
 			return null;
 		}
-		List<BlockPos> positions = new ArrayList<>();
-		if (!shape.contains(clicked)) {
-			positions.add(clicked);
-		}
+		// 点击的容器优先入列（并且占用一个名额），避免形状遍历顺序把它挤出 max 之外
+		Set<BlockPos> unique = new LinkedHashSet<>();
+		unique.add(clicked);
 		for (BlockPos pos : shape) {
-			if (positions.size() >= max) {
+			if (unique.size() >= max) {
 				break;
 			}
-			positions.add(pos);
+			unique.add(pos);
 		}
-		return positions;
+		return new ArrayList<>(unique);
 	}
 
 	/**
@@ -1592,10 +1607,11 @@ public final class OutputSlotExtractor {
 			return isContainerEnabled("brewing_stand") ? (mode == ExtractionMode.INPUT ? new int[] { 3 } : new int[] { 4 }) : null;
 		}
 		// 没有槽位语义的容器，input/fuel 预设都放入全部槽位
+		// 同样要排除投掷器：它继承自 DispenserBlockEntity，否则关掉投掷器开关也拦不住
 		if (blockEntity instanceof DropperBlockEntity) {
 			return isContainerEnabled("dropper") ? allSlots(blockEntity) : null;
 		}
-		if (blockEntity instanceof DispenserBlockEntity) {
+		if (blockEntity instanceof DispenserBlockEntity && !(blockEntity instanceof DropperBlockEntity)) {
 			return isContainerEnabled("dispenser") ? allSlots(blockEntity) : null;
 		}
 		if (blockEntity instanceof HopperBlockEntity) {
@@ -1720,8 +1736,9 @@ public final class OutputSlotExtractor {
 
 	/**
 	 * 厨锅在指定模式下的槽位。
+	 * 包内可见：{@link ExtractionPreviewItems} 的 Jade 预览复用同一份槽位表，避免两处各写一套而走样。
 	 */
-	private static int[] cookingPotSlots(ExtractionMode mode) {
+	static int[] cookingPotSlots(ExtractionMode mode) {
 		if (mode == ExtractionMode.ALL) {
 			return new int[] { 0, 1, 2, 3, 4, 5, 6, 7, 8 };
 		}
@@ -1774,13 +1791,14 @@ public final class OutputSlotExtractor {
 	}
 
 	/**
-	 * 把物品放入玩家背包
+	 * 把物品放入玩家背包，返回实际放入的数量（放不下的部分留在stack里，由调用方决定如何处理）。
+	 * 这里不能用 PlayerInventory#offer：背包完全没有空位时它会把整组物品丢到地上且不清空传入的堆叠，
+	 * 按差值算出来就是0，调用方会认为"没放进去"而保留容器里的那一份。
 	 */
 	private static int tryInsertToPlayer(PlayerEntity player, ItemStack stack) {
-		int original = stack.getCount();
 		ItemStack toInsert = stack.copy();
-		player.getInventory().offer(toInsert, false);
-		return original - toInsert.getCount();
+		player.getInventory().insertStack(toInsert);
+		return stack.getCount() - toInsert.getCount();
 	}
 
 	private static ActionResult takeFromInventory(PlayerEntity player, World world, Inventory inventory, int[] slots) {
@@ -1813,9 +1831,8 @@ public final class OutputSlotExtractor {
 			}
 
 			result.decrement(taken);
-			if (result.isEmpty()) {
-				inventory.setStack(slot, ItemStack.EMPTY);
-			}
+			// 与放入路径的兜底保持一致。
+			inventory.setStack(slot, result.isEmpty() ? ItemStack.EMPTY : result);
 			takenAny = true;
 		}
 		return takenAny;

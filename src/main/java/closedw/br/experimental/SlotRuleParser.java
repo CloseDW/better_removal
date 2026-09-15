@@ -95,6 +95,10 @@ final class SlotRuleParser {
 			if (slots == null && !token.substring(separator + 1).trim().equals("*")) {
 				return List.of();
 			}
+			if (slots != null && slots.isEmpty()) {
+				// "input=" 这种空槽位表是写错了，整条规则作废，而不是当成"什么都不声明"
+				return List.of();
+			}
 			assignments.add(new SlotRule.Assignment(role, slots));
 		}
 		if (assignments.isEmpty()) {

@@ -57,6 +57,13 @@ public class BetterRemovalConfig implements IModConfig
      */
     public static final Map<String, List<String>> LIST_DEFAULTS = new LinkedHashMap<>();
 
+    /**
+     * 带说明文案（{@code config.<modid>.<key>.tooltip}）的布尔开关。
+     * 只有列在这里的键才会把 tooltip 交给 Configured，避免缺文案时界面显示原始翻译键。
+     */
+    public static final Set<String> TOOLTIP_KEYS = Set.of(
+            "experimental_auto_detect", "experimental_transfer_probe");
+
     static
     {
         // 三个顶层大类：容器开关 / 实验性 / 通用；“容器开关”下再按模组分子类
@@ -167,7 +174,7 @@ public class BetterRemovalConfig implements IModConfig
         DEFAULT_VALUES.forEach((key, defaultValue) ->
         {
             boolean value = Boolean.parseBoolean(props.getProperty(key, String.valueOf(defaultValue)));
-            this.values.put(key, new BooleanValue(key, defaultValue, value));
+            this.values.put(key, new BooleanValue(key, defaultValue, value, TOOLTIP_KEYS.contains(key)));
         });
         INT_DEFAULTS.forEach((key, defaultValue) ->
         {

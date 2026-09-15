@@ -6,19 +6,22 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * 布尔配置项的临时值（Configured编辑时使用）。
+ * 只有 {@code config.better-removal.<key>.tooltip} 文案确实存在的开关才带说明（见 BetterRemovalConfig#TOOLTIP_KEYS）。
  */
 public class BooleanValue implements IConfigValue<Boolean>
 {
     private final String key;
     private final boolean defaultValue;
     private final boolean initialValue;
+    private final boolean hasComment;
     private boolean value;
 
-    public BooleanValue(String key, boolean defaultValue, boolean initialValue)
+    public BooleanValue(String key, boolean defaultValue, boolean initialValue, boolean hasComment)
     {
         this.key = key;
         this.defaultValue = defaultValue;
         this.initialValue = initialValue;
+        this.hasComment = hasComment;
         this.value = initialValue;
     }
 
@@ -68,7 +71,7 @@ public class BooleanValue implements IConfigValue<Boolean>
     @Override
     public Text getComment()
     {
-        return null;
+        return this.hasComment ? Text.translatable(this.getTranslationKey() + ".tooltip") : null;
     }
 
     @Nullable

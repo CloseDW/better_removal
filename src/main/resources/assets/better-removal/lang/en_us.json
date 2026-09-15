@@ -67,11 +67,13 @@
   "config.better-removal.roaster": "Roaster",
   "config.better-removal.stove": "Stove",
   "config.better-removal.category.experimental": "Experimental",
-  "config.better-removal.experimental_auto_detect": "Auto-detect containers ",
+  "config.better-removal.experimental_auto_detect": "Auto-detect containers",
+  "config.better-removal.experimental_auto_detect.tooltip": "Master switch for the generic container support: hand-written slot rules and auto-detection. Off by default.",
   "config.better-removal.experimental_auto_detect_whitelist": "Auto-detect whitelist",
-  "config.better-removal.experimental_auto_detect_whitelist.tooltip": "Only blocks listed here are auto-detected :  modid:block_id matches one block",
+  "config.better-removal.experimental_auto_detect_whitelist.tooltip": "Only blocks listed here are auto-detected (case-insensitive). One entry per line: modid:block_id (one block), modid or modid:* (whole mod), * (everything), @class.prefix (block entity class). An empty list disables auto-detection.",
   "config.better-removal.experimental_transfer_probe": "Active probe mode",
   "config.better-removal.experimental_transfer_probe.tooltip": "Adds an \"Active Probe\" entry to the mode wheel: hold the modifier and right-click a container to run two slot probes (menu read-only, inventory interface) and print the results to chat as rule JSON. Off by default.",
   "config.better-removal.experimental_slot_rules": "Container slot rules",
-  "config.better-removal.experimental_slot_rules.tooltip": "Hand-written slot map, : <match> <role>=<slots> ... For example: ironfurnaces input=0 fuel=1 output=2. Match is case-insensitive:  modid:block_id covers one block "
+  "config.better-removal.experimental_slot_rules.tooltip": "Hand-written slot map, one rule per line: <match> <role>=<slots> ... For example: ironfurnaces input=0 fuel=1 output=2. Match is case-insensitive and accepts modid:block_id, modid or modid:*, * and @class.prefix.",
+  "modmenu.descriptionTranslation.better-removal": "Hold Left Alt and right-click a container to move items without opening its GUI."
 }

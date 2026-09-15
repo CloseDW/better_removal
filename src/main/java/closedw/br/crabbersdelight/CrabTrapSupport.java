@@ -27,11 +27,6 @@ public final class CrabTrapSupport {
 	 */
 	private static final String CRAB_TRAP_CLASS = "alabaster.crabbersdelight.common.block.entity.CrabTrapBlockEntity";
 
-	/**
-	 * 捕获物槽索引（1-9）
-	 */
-	private static final int[] CATCH_SLOTS = { 1, 2, 3, 4, 5, 6, 7, 8, 9 };
-
 	private static final boolean LOADED = checkLoaded();
 
 	private static boolean checkLoaded() {
@@ -64,12 +59,5 @@ public final class CrabTrapSupport {
 		catch (Throwable t) {
 			return false;
 		}
-	}
-
-	/**
-	 * 获取捕蟹笼的捕获物槽索引（1-9）。
-	 */
-	public static int[] getCatchSlots() {
-		return CATCH_SLOTS;
 	}
 }

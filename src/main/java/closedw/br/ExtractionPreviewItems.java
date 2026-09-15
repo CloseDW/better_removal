@@ -24,19 +24,8 @@ public final class ExtractionPreviewItems {
 			if (!OutputSlotExtractor.isContainerEnabled("cooking_pot")) {
 				return null;
 			}
-			int[] slots;
-			if (mode == ExtractionMode.ALL) {
-				slots = new int[] { 0, 1, 2, 3, 4, 5, 6, 7, 8 };
-			}
-			else if (mode == ExtractionMode.OUTPUT) {
-				slots = new int[] { 8 };
-			}
-			else if (mode == ExtractionMode.INPUT) {
-				slots = new int[] { 0, 1, 2, 3, 4, 5 };
-			}
-			else {
-				slots = new int[] { 7 };
-			}
+			// 槽位表复用服务端取物用的那一份
+			int[] slots = OutputSlotExtractor.cookingPotSlots(mode);
 			List<ItemStack> items = new ArrayList<>();
 			for (int slot : slots) {
 				ItemStack stack = FarmersDelightSupport.getSlot(null, blockEntity.getPos(), blockEntity, slot);

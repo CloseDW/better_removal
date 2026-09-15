@@ -3,7 +3,7 @@
 	"id": "better-removal",
 	"version": "${version}",
 	"name": "better removal",
-	"description": "Sneak + empty-hand right-click a container to directly extract its items without opening the GUI.",
+	"description": "Hold Left Alt (rebindable) and right-click a container to extract or deposit its items without opening the GUI.",
 	"authors": [
 		"CloseDW"
 	],

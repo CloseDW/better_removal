@@ -6,8 +6,8 @@ import net.fabricmc.fabric.api.networking.v1.PacketType;
 import net.minecraft.network.PacketByteBuf;
 
 /**
- * 客户端 -> 服务端：同步"取出物品"左Alt
- * 仅在安装Carry On时由客户端发送，用于在服务端判断是否触发出品槽提取。
+ * 客户端 -> 服务端：同步修饰键（左Alt，可改键）的按下状态。
+ * 由客户端在按键状态变化时发送，服务端据此判断是否触发免开 GUI 的取出/放入/补货。
  */
 public record ExtractKeyStateC2SPacket(boolean pressed) implements FabricPacket {
 

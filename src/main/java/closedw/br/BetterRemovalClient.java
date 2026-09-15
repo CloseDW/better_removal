@@ -7,6 +7,7 @@ import closedw.br.networking.ExtractionModeSyncS2CPacket;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.minecraft.client.option.KeyBinding;
@@ -38,9 +39,25 @@ public class BetterRemovalClient implements ClientModInitializer {
 
 		registerModeKey();
 		registerExtractKey();
+		registerConnectionSync();
 
 		// 模式滚轮绘制（快捷栏上方）
 		HudRenderCallback.EVENT.register((context, tickDelta) -> ModeWheel.render(context));
+	}
+
+	/**
+	 * 服务端在玩家加入时把修饰键状态重置为"未按下"。客户端只在按键状态变化时才发包，
+	 * 所以重连后必须重新同步一次，否则修饰键要抬起来再按才生效。
+	 */
+	private void registerConnectionSync() {
+		ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
+			extractLastPressed = false;
+			if (extractKey != null && extractKey.isPressed()) {
+				extractLastPressed = true;
+				ClientPlayNetworking.send(new ExtractKeyStateC2SPacket(true));
+			}
+		});
+		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> extractLastPressed = false);
 	}
 
 	/**
