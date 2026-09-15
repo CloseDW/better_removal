@@ -2,23 +2,22 @@ package common.client;
 
 import common.CarryOnKeyState;
 import common.ExtractionModeManager;
+import common.ModeState;
 import common.networking.ExtractKeyStateC2SPayload;
-import common.networking.ExtractionModeCycleC2SPayload;
 import common.networking.ExtractionModeSyncS2CPayload;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.loader.api.FabricLoader;
+import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 import org.lwjgl.glfw.GLFW;
 
 /**
  * 客户端初始化。
- * - 取出模式切换按键：默认不指定按键，按下后循环切换取出模式。
- * - 接收服务端同步的取出模式（供Jade联动预览）。
- * - 仅在同时安装Carry On时注册"取出物品"左Alt键，避免与Carry On的Shift+右键冲突。
+ * - 修饰键（左Alt，可改键）：按下状态始终同步到服务端。
+ * - 模式键：按住时在快捷栏上方显示模式列表，滚轮选择，松开生效。
  */
 public class BetterRemovalClient implements ClientModInitializer {
 
@@ -27,40 +26,45 @@ public class BetterRemovalClient implements ClientModInitializer {
 	private static final String MODE_KEY = "key.better-removal.mode";
 
 	private static KeyBinding extractKey;
-	private static boolean lastPressed = false;
+	private static KeyBinding modeKey;
+	private static boolean extractLastPressed = false;
+	private static boolean modeLastPressed = false;
 
 	@Override
 	public void onInitializeClient() {
-		// 接收服务端同步的取出模式
 		ClientPlayNetworking.registerGlobalReceiver(ExtractionModeSyncS2CPayload.ID,
-				(payload, context) -> ExtractionModeManager.setClientMode(payload.mode()));
+				(payload, context) -> ExtractionModeManager.setClientState(
+						new ModeState(payload.action(), payload.mode()), payload.probeAvailable()));
 
-		registerModeCycleKey();
+		registerModeKey();
+		registerExtractKey();
 
-		if (FabricLoader.getInstance().isModLoaded("carryon")) {
-			registerExtractKey();
-		}
+		HudRenderCallback.EVENT.register((context, tickDelta) -> ModeWheel.render(context));
 	}
 
-	/**
-	 * 取出模式循环切换按键（默认不绑定）。按下时发送循环切换请求。
-	 */
-	private void registerModeCycleKey() {
-		KeyBinding modeKey = KeyBindingHelper.registerKeyBinding(
+	private void registerModeKey() {
+		modeKey = KeyBindingHelper.registerKeyBinding(
 				new KeyBinding(MODE_KEY, InputUtil.Type.KEYSYM, InputUtil.UNKNOWN_KEY.getCode(), CATEGORY));
 
 		ClientTickEvents.END_CLIENT_TICK.register(mc -> {
 			if (mc.player == null) {
 				return;
 			}
-			if (modeKey.wasPressed()) {
-				ClientPlayNetworking.send(new ExtractionModeCycleC2SPayload());
+			boolean pressed = modeKey.isPressed();
+			if (pressed != modeLastPressed) {
+				modeLastPressed = pressed;
+				if (pressed) {
+					ModeWheel.open();
+				}
+				else {
+					ModeWheel.commit();
+				}
 			}
 		});
 	}
 
 	/**
-	 * Carry On 兼容键：左Alt 按下状态同步到服务端。
+	 * 修饰键（左Alt，可改键）：按下状态始终同步到服务端。
 	 */
 	private void registerExtractKey() {
 		extractKey = KeyBindingHelper.registerKeyBinding(
@@ -72,10 +76,17 @@ public class BetterRemovalClient implements ClientModInitializer {
 			}
 			boolean pressed = extractKey.isPressed();
 			CarryOnKeyState.setPressed(pressed);
-			if (pressed != lastPressed) {
-				lastPressed = pressed;
+			if (pressed != extractLastPressed) {
+				extractLastPressed = pressed;
 				ClientPlayNetworking.send(new ExtractKeyStateC2SPayload(pressed));
 			}
 		});
+	}
+
+	/**
+	 * 修饰键是否处于按下状态（供 Jade 预览判断左Alt）。
+	 */
+	public static boolean isExtractKeyPressed() {
+		return extractKey != null && extractKey.isPressed();
 	}
 }

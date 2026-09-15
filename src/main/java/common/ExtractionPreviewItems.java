@@ -1,5 +1,6 @@
 package common;
 
+import common.cookingforblockheads.CookingForBlockheadsSupport;
 import common.farmersdelight.FarmersDelightSupport;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.inventory.Inventory;
@@ -10,7 +11,7 @@ import java.util.List;
 
 /**
  * 计算当前模式下将要取出的物品（服务端取物逻辑与 Jade 预览共用）。
- * 返回 null 表示该容器不受支持/未启用
+ * 返回 null 表示该容器不受支持/未启用。
  */
 public final class ExtractionPreviewItems {
 
@@ -18,7 +19,6 @@ public final class ExtractionPreviewItems {
 	}
 
 	public static List<ItemStack> collect(BlockEntity blockEntity, ExtractionMode mode) {
-		// 农夫乐事厨锅：通过反射访问其 ItemStackHandler
 		if (FarmersDelightSupport.isCookingPot(blockEntity)) {
 			if (!OutputSlotExtractor.isContainerEnabled("cooking_pot")) {
 				return null;
@@ -46,6 +46,28 @@ public final class ExtractionPreviewItems {
 			return items;
 		}
 
+		if (CookingForBlockheadsSupport.isOven(blockEntity)) {
+			if (!OutputSlotExtractor.isContainerEnabled("oven") || CookingForBlockheadsSupport.isAutomationDisallowed()) {
+				return null;
+			}
+			int[] slots = OutputSlotExtractor.getSlotsForMode(blockEntity, mode);
+			Inventory ovenInventory = CookingForBlockheadsSupport.getInternalContainer(blockEntity);
+			if (slots == null || ovenInventory == null) {
+				return null;
+			}
+			List<ItemStack> items = new ArrayList<>();
+			for (int slot : slots) {
+				if (slot < 0 || slot >= ovenInventory.size()) {
+					continue;
+				}
+				ItemStack stack = ovenInventory.getStack(slot);
+				if (!stack.isEmpty()) {
+					items.add(stack);
+				}
+			}
+			return items;
+		}
+
 		int[] slots = OutputSlotExtractor.getSlotsForMode(blockEntity, mode);
 		if (slots == null) {
 			return null;
@@ -56,7 +78,6 @@ public final class ExtractionPreviewItems {
 
 		List<ItemStack> items = new ArrayList<>();
 		for (int slot : slots) {
-			// 越界保护：模组更新可能改变槽位布局，getStack越界会抛异常
 			if (slot < 0 || slot >= inventory.size()) {
 				continue;
 			}

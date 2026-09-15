@@ -1,6 +1,6 @@
 package common;
 
-import common.networking.ExtractionModeCycleC2SPayload;
+import common.networking.ExtractionModeSetC2SPayload;
 import common.networking.ExtractionModeSyncS2CPayload;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
@@ -26,8 +26,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 按玩家记录取出模式，并持久化到配置文件（服务器重启后仍保留）。
- * 配置文件位于 config/better-removal-modes.properties，键为玩家UUID，值为模式名。
+ * 按玩家记录交互模式（行为+槽位），并持久化到配置文件（服务器重启后仍保留）。
+ * 兼容旧格式（仅槽位名，视为取出行为）。
  */
 public final class ExtractionModeManager {
 
@@ -35,10 +35,13 @@ public final class ExtractionModeManager {
 	private static final String FILE_NAME = "better-removal-modes.properties";
 
 	private static final Path PATH = FabricLoader.getInstance().getConfigDir().resolve(FILE_NAME);
-	private static final Map<UUID, ExtractionMode> MODES = new ConcurrentHashMap<>();
+	private static final Map<UUID, ModeState> STATES = new ConcurrentHashMap<>();
 
 	/** 客户端缓存的当前模式（由服务端通过 S2C 包同步） */
-	private static volatile ExtractionMode CLIENT_MODE = ExtractionMode.OUTPUT;
+	private static volatile ModeState CLIENT_STATE = ModeState.DEFAULT;
+
+	/** 客户端缓存的"主动探测是否可用"（由服务端通过 S2C 包同步） */
+	private static volatile boolean CLIENT_PROBE_AVAILABLE = false;
 
 	static {
 		load();
@@ -58,22 +61,40 @@ public final class ExtractionModeManager {
 			}
 		}
 		props.forEach((key, value) -> {
-			try {
-				MODES.put(UUID.fromString((String) key), ExtractionMode.valueOf((String) value));
-			}
-			catch (Exception e) {
+			ModeState state = parseState((String) value);
+			if (state == null) {
 				LOGGER.warn("Skipping invalid extraction mode entry: {}={}", key, value);
+				return;
+			}
+			try {
+				STATES.put(UUID.fromString((String) key), state);
+			}
+			catch (IllegalArgumentException e) {
+				LOGGER.warn("Skipping extraction mode entry with invalid player UUID: {}={}", key, value);
 			}
 		});
 	}
 
+	private static ModeState parseState(String value) {
+		try {
+			int split = value.indexOf(':');
+			if (split >= 0) {
+				return new ModeState(ExtractionAction.valueOf(value.substring(0, split)), ExtractionMode.valueOf(value.substring(split + 1)));
+			}
+			return new ModeState(ExtractionAction.EXTRACT, ExtractionMode.valueOf(value));
+		}
+		catch (Exception e) {
+			return null;
+		}
+	}
+
 	private static void save() {
 		Properties props = new Properties();
-		MODES.forEach((uuid, mode) -> props.setProperty(uuid.toString(), mode.name()));
+		STATES.forEach((uuid, state) -> props.setProperty(uuid.toString(), state.action().name() + ":" + state.mode().name()));
 		try {
 			Files.createDirectories(PATH.getParent());
 			try (OutputStream out = Files.newOutputStream(PATH)) {
-				props.store(out, "Better Removal per-player extraction modes");
+				props.store(out, "Better Removal per-player modes");
 			}
 		}
 		catch (IOException e) {
@@ -81,69 +102,95 @@ public final class ExtractionModeManager {
 		}
 	}
 
-	public static ExtractionMode getMode(PlayerEntity player) {
-		return MODES.getOrDefault(player.getUuid(), ExtractionMode.OUTPUT);
+	public static ModeState getState(PlayerEntity player) {
+		return STATES.getOrDefault(player.getUuid(), ModeState.DEFAULT);
 	}
 
-	/**
-	 * 客户端缓存的当前模式（供 Jade 联动等客户端功能读取）。
-	 */
-	public static ExtractionMode getClientMode() {
-		return CLIENT_MODE;
+	public static ModeState getClientState() {
+		return CLIENT_STATE;
 	}
 
-	public static void setClientMode(ExtractionMode mode) {
-		CLIENT_MODE = mode;
+	public static void setClientState(ModeState state) {
+		CLIENT_STATE = state;
 	}
 
-	/**
-	 * 注册按键切换数据包的接收器：循环切换到下一个模式并回发提示。
-	 * 并处理玩家加入时的模式同步。
-	 */
+	public static boolean isClientProbeAvailable() {
+		return CLIENT_PROBE_AVAILABLE;
+	}
+
+	public static void setClientState(ModeState state, boolean probeAvailable) {
+		CLIENT_STATE = state;
+		CLIENT_PROBE_AVAILABLE = probeAvailable;
+	}
+
+	/** 主动探测是否可用：实验性总开关 + 主动探测开关都打开。 */
+	public static boolean isProbeAvailable() {
+		return OutputSlotExtractor.isExperimentalEnabled()
+				&& OutputSlotExtractor.isContainerEnabled("experimental_transfer_probe");
+	}
+
+	/** 重新向客户端同步模式与"主动探测是否可用"。 */
+	public static void refreshClient(ServerPlayerEntity player) {
+		ServerPlayNetworking.send(player,
+				new ExtractionModeSyncS2CPayload(getState(player).action(), getState(player).mode(), isProbeAvailable()));
+	}
+
+	/** 防御非法组合：放入预设只允许 input/fuel；补货固定全部；主动探测不使用槽位模式 */
+	private static ModeState sanitize(ModeState state) {
+		if (state.action() == ExtractionAction.PROBE) {
+			return new ModeState(ExtractionAction.PROBE, ExtractionMode.ALL);
+		}
+		if (state.action() == ExtractionAction.DEPOSIT && state.mode() != ExtractionMode.INPUT && state.mode() != ExtractionMode.FUEL) {
+			return new ModeState(ExtractionAction.DEPOSIT, ExtractionMode.INPUT);
+		}
+		if (state.action() == ExtractionAction.RESTOCK && state.mode() != ExtractionMode.ALL) {
+			return new ModeState(ExtractionAction.RESTOCK, ExtractionMode.ALL);
+		}
+		return state;
+	}
+
+	/** 注册网络包接收器，并处理玩家加入时的模式同步。 */
 	public static void registerServerHandlers() {
-		PayloadTypeRegistry.playC2S().register(ExtractionModeCycleC2SPayload.ID, ExtractionModeCycleC2SPayload.CODEC);
+		PayloadTypeRegistry.playC2S().register(ExtractionModeSetC2SPayload.ID, ExtractionModeSetC2SPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(ExtractionModeSyncS2CPayload.ID, ExtractionModeSyncS2CPayload.CODEC);
 
-		ServerPlayNetworking.registerGlobalReceiver(ExtractionModeCycleC2SPayload.ID, (payload, context) -> {
+		ServerPlayNetworking.registerGlobalReceiver(ExtractionModeSetC2SPayload.ID, (payload, context) -> {
 			ServerPlayerEntity player = context.player();
-			ExtractionMode next = getMode(player).next();
-			setMode(player, next);
-			player.sendMessage(getModeMessage(next), false);
+			ModeState state = setState(player, new ModeState(payload.action(), payload.mode()));
+			player.sendMessage(getStateMessage(state), false);
 		});
 
-		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> ServerPlayNetworking.send(handler.player, new ExtractionModeSyncS2CPayload(getMode(handler.player))));
+		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
+				ServerPlayNetworking.send(handler.player,
+						new ExtractionModeSyncS2CPayload(getState(handler.player).action(), getState(handler.player).mode(), isProbeAvailable())));
 	}
 
-	public static void setMode(ServerPlayerEntity player, ExtractionMode mode) {
-		MODES.put(player.getUuid(), mode);
+	public static ModeState setState(ServerPlayerEntity player, ModeState state) {
+		state = sanitize(state);
+		STATES.put(player.getUuid(), state);
 		save();
-		ServerPlayNetworking.send(player, new ExtractionModeSyncS2CPayload(mode));
+		ServerPlayNetworking.send(player,
+				new ExtractionModeSyncS2CPayload(state.action(), state.mode(), isProbeAvailable()));
+		return state;
 	}
 
 	/**
-	 * 生成切换提示文本
-	 * 前缀与括号用一种颜色，模式名用另一种高亮颜色。
+	 * 生成模式提示文本，如：当前模式【取出 · 输出槽】
 	 */
-	public static Text getModeMessage(ExtractionMode mode) {
-		MutableText prefix = Text.literal(Text.translatable("better-removal.message.mode_prefix").getString())
+	public static Text getStateMessage(ModeState state) {
+		MutableText prefix = Text.translatable("better-removal.message.state_prefix")
 				.setStyle(Style.EMPTY.withColor(Formatting.YELLOW));
 		MutableText open = Text.literal("【").setStyle(Style.EMPTY.withColor(Formatting.AQUA));
-		MutableText name = Text.translatable(mode.getTranslationKey())
-				.setStyle(Style.EMPTY.withColor(mode.getAccentColor()));
+		MutableText action = Text.translatable(state.action().getTranslationKey())
+				.setStyle(Style.EMPTY.withColor(state.action().getAccentColor()));
+		if (!state.action().hasSlotMode()) {
+			return prefix.append(open).append(action)
+					.append(Text.literal("】").setStyle(Style.EMPTY.withColor(Formatting.AQUA)));
+		}
+		MutableText middle = Text.literal(" · ").setStyle(Style.EMPTY.withColor(Formatting.AQUA));
+		MutableText slot = Text.translatable(state.mode().getTranslationKey())
+				.setStyle(Style.EMPTY.withColor(state.mode().getAccentColor()));
 		MutableText close = Text.literal("】").setStyle(Style.EMPTY.withColor(Formatting.AQUA));
-		return prefix.append(open).append(name).append(close);
-	}
-
-	/**
-	 * 生成 /br now 提示：当前取出模式
-	 */
-	public static Text getCurrentModeMessage(ExtractionMode mode) {
-		MutableText prefix = Text.literal(Text.translatable("better-removal.message.current_mode_prefix").getString())
-				.setStyle(Style.EMPTY.withColor(Formatting.GRAY));
-		MutableText open = Text.literal("【").setStyle(Style.EMPTY.withColor(Formatting.AQUA));
-		MutableText name = Text.translatable(mode.getTranslationKey())
-				.setStyle(Style.EMPTY.withColor(mode.getAccentColor()));
-		MutableText close = Text.literal("】").setStyle(Style.EMPTY.withColor(Formatting.AQUA));
-		return prefix.append(open).append(name).append(close);
+		return prefix.append(open).append(action).append(middle).append(slot).append(close);
 	}
 }

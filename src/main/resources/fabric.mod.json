@@ -15,6 +15,9 @@
 	"license": "MIT",
 	"icon": "assets/better-removal/icon.png",
 	"environment": "*",
+	"mixins": [
+		"better-removal.mixins.json"
+	],
 	"entrypoints": {
 		"main": [
 			"common.BetterRemoval"

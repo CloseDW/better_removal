@@ -1,8 +1,9 @@
 package common.jade;
 
 import common.BetterRemoval;
-import common.ExtractionMode;
+import common.ExtractionAction;
 import common.ExtractionModeManager;
+import common.ModeState;
 import common.OutputSlotExtractor;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.item.ItemStack;
@@ -16,9 +17,7 @@ import snownee.jade.api.IServerDataProvider;
 import java.util.List;
 
 /**
- * Jade 服务端数据提供器：把当前模式下将要取出的真实物品下发给客户端。
- * 解决部分容器（原版/Aether/Fossil/Vinery等）不把库存同步到客户端方块实体，
- * 导致客户端本地无法读取物品的问题。
+ * Jade 服务端数据提供器：把当前模式下将要取出/补货的真实物品下发给客户端。
  */
 public class BetterRemovalServerData implements IServerDataProvider<BlockAccessor> {
 
@@ -38,9 +37,21 @@ public class BetterRemovalServerData implements IServerDataProvider<BlockAccesso
 		if (blockEntity == null) {
 			return;
 		}
+		if (!OutputSlotExtractor.isModifierHeld(player)) {
+			return;
+		}
 
-		ExtractionMode mode = ExtractionModeManager.getMode(player);
-		List<ItemStack> items = OutputSlotExtractor.collectPreview(player, blockEntity, mode);
+		ModeState state = ExtractionModeManager.getState(player);
+		List<ItemStack> items;
+		if (state.action() == ExtractionAction.EXTRACT) {
+			items = OutputSlotExtractor.collectPreview(player, blockEntity, state.mode());
+		}
+		else if (state.action() == ExtractionAction.RESTOCK) {
+			items = OutputSlotExtractor.collectRestockPreview(blockEntity, player);
+		}
+		else {
+			return;
+		}
 		if (items == null || items.isEmpty()) {
 			return;
 		}

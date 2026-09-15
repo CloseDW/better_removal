@@ -7,6 +7,7 @@ import com.mrcrayfish.configured.api.IConfigValue;
 import com.mrcrayfish.configured.api.IModConfig;
 import com.mrcrayfish.configured.util.ConfigHelper;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.Text;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,7 +25,7 @@ import java.util.Properties;
 import java.util.Set;
 
 /**
- * Better Removal的配置：为每种容器提供ON/OFF
+ * Better Removal的配置：为每种容器提供ON/OFF，另含实验性槽位规则/白名单。
  */
 public class BetterRemovalConfig implements IModConfig
 {
@@ -33,43 +34,47 @@ public class BetterRemovalConfig implements IModConfig
     private static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
     /**
-     * 配置分组：分组名->配置键列表
-     * 不同模组的容器按模组分类
+     * 顶层分组：分组名->配置键列表（不含“容器开关”，它由 {@link #CONTAINER_CATEGORIES} 组合而成）。
      */
     public static final Map<String, List<String>> CATEGORIES = new LinkedHashMap<>();
 
     /**
-     * 配置键与默认值。
+     * “容器开关”大类下的各模组子分组。
      */
+    public static final Map<String, List<String>> CONTAINER_CATEGORIES = new LinkedHashMap<>();
+
     public static final Map<String, Boolean> DEFAULT_VALUES = new LinkedHashMap<>();
 
-    /**
-     * 整数配置键与默认值。
-     */
     public static final Map<String, Integer> INT_DEFAULTS = new LinkedHashMap<>();
+
+    public static final Map<String, List<String>> LIST_DEFAULTS = new LinkedHashMap<>();
 
     static
     {
-        CATEGORIES.put("general", List.of("jade_preview", "ftb_ultimine", "ftb_ultimine_max_containers"));
-
-        CATEGORIES.put("vanilla", List.of(
+        // 三个顶层大类：容器开关 / 实验性 / 通用；“容器开关”下再按模组分子类
+        CONTAINER_CATEGORIES.put("vanilla", List.of(
                 "furnace", "blast_furnace", "smoker", "brewing_stand",
                 "hopper", "dispenser", "dropper"));
+        CONTAINER_CATEGORIES.put("farmersdelight", List.of("cooking_pot", "basket"));
+        CONTAINER_CATEGORIES.put("ad_astra", List.of("compressor", "etrionic_blast_furnace", "fuel_refinery", "oxygen_loader", "cryo_freezer"));
+        CONTAINER_CATEGORIES.put("crabbersdelight", List.of("crab_trap"));
+        CONTAINER_CATEGORIES.put("aether", List.of("freezer", "altar"));
+        CONTAINER_CATEGORIES.put("vinery", List.of("fermentation_barrel", "apple_press"));
+        CONTAINER_CATEGORIES.put("fossil", List.of("analyzer", "sifter", "culture_vat", "worktable"));
+        CONTAINER_CATEGORIES.put("cookingforblockheads", List.of("oven"));
+        CONTAINER_CATEGORIES.put("farm_and_charm", List.of("fc_cooking_pot", "roaster", "stove"));
 
-        CATEGORIES.put("farmersdelight", List.of("cooking_pot", "basket"));
+        CATEGORIES.put("experimental", List.of(
+                "experimental_auto_detect", "experimental_auto_detect_whitelist",
+                "experimental_transfer_probe", "experimental_slot_rules"));
 
-        CATEGORIES.put("ad_astra", List.of("compressor", "etrionic_blast_furnace", "fuel_refinery", "oxygen_loader", "cryo_freezer"));
-
-        CATEGORIES.put("crabbersdelight", List.of("crab_trap"));
-
-        CATEGORIES.put("aether", List.of("freezer", "altar"));
-
-        CATEGORIES.put("vinery", List.of("fermentation_barrel", "apple_press"));
-
-        CATEGORIES.put("fossil", List.of("analyzer", "sifter", "culture_vat", "worktable"));
+        CATEGORIES.put("general", List.of(
+                "jade_preview", "ftb_ultimine", "deposit", "restock", "ftb_ultimine_max_containers"));
 
         DEFAULT_VALUES.put("jade_preview", true);
         DEFAULT_VALUES.put("ftb_ultimine", true);
+        DEFAULT_VALUES.put("deposit", true);
+        DEFAULT_VALUES.put("restock", true);
         DEFAULT_VALUES.put("furnace", true);
         DEFAULT_VALUES.put("blast_furnace", true);
         DEFAULT_VALUES.put("smoker", true);
@@ -79,6 +84,9 @@ public class BetterRemovalConfig implements IModConfig
         DEFAULT_VALUES.put("dropper", true);
         DEFAULT_VALUES.put("cooking_pot", true);
         DEFAULT_VALUES.put("basket", true);
+        DEFAULT_VALUES.put("fc_cooking_pot", true);
+        DEFAULT_VALUES.put("roaster", true);
+        DEFAULT_VALUES.put("stove", true);
         DEFAULT_VALUES.put("compressor", true);
         DEFAULT_VALUES.put("etrionic_blast_furnace", true);
         DEFAULT_VALUES.put("fuel_refinery", true);
@@ -93,13 +101,20 @@ public class BetterRemovalConfig implements IModConfig
         DEFAULT_VALUES.put("sifter", true);
         DEFAULT_VALUES.put("culture_vat", true);
         DEFAULT_VALUES.put("worktable", true);
+        DEFAULT_VALUES.put("oven", true);
 
-        // FTB Ultimine连锁取出：单次最多处理的容器数量（连锁形状本身最多64格）
+        DEFAULT_VALUES.put("experimental_auto_detect", false);
+        DEFAULT_VALUES.put("experimental_transfer_probe", false);
+
         INT_DEFAULTS.put("ftb_ultimine_max_containers", 64);
+
+        LIST_DEFAULTS.put("experimental_auto_detect_whitelist", List.of());
+        LIST_DEFAULTS.put("experimental_slot_rules", List.of());
     }
 
     private final Map<String, BooleanValue> values = new LinkedHashMap<>();
     private final Map<String, IntegerValue> intValues = new LinkedHashMap<>();
+    private final Map<String, StringListValue> listValues = new LinkedHashMap<>();
     private IConfigEntry root;
 
     private BetterRemovalConfig()
@@ -152,24 +167,38 @@ public class BetterRemovalConfig implements IModConfig
             }
             this.intValues.put(key, new IntegerValue(key, defaultValue, value));
         });
+        LIST_DEFAULTS.forEach((key, defaultValue) ->
+        {
+            List<String> value = new ArrayList<>();
+            // 用换行分隔，避免与规则本身的逗号（槽位表 / 逗号 match）冲突
+            for(String part : props.getProperty(key, "").split("\n"))
+            {
+                String entry = part.trim();
+                if(!entry.isEmpty())
+                {
+                    value.add(entry);
+                }
+            }
+            this.listValues.put(key, new StringListValue(key, defaultValue, value));
+        });
     }
 
-    /**
-     * 查询某个容器是否启用（默认启用）。
-     */
     public boolean isEnabled(String key)
     {
         BooleanValue value = this.values.get(key);
         return value == null || value.get();
     }
 
-    /**
-     * 查询整数配置（未配置时返回默认值）。
-     */
     public int getInt(String key)
     {
         IntegerValue value = this.intValues.get(key);
         return value != null ? value.get() : INT_DEFAULTS.getOrDefault(key, 0);
+    }
+
+    public List<String> getList(String key)
+    {
+        StringListValue value = this.listValues.get(key);
+        return value != null ? value.get() : LIST_DEFAULTS.getOrDefault(key, List.of());
     }
 
     @Override
@@ -184,6 +213,7 @@ public class BetterRemovalConfig implements IModConfig
         Properties props = new Properties();
         this.values.forEach((key, value) -> props.setProperty(key, String.valueOf(value.get())));
         this.intValues.forEach((key, value) -> props.setProperty(key, String.valueOf(value.get())));
+        this.listValues.forEach((key, value) -> props.setProperty(key, String.join("\n", value.get())));
         Path path = getPath();
         try
         {
@@ -206,18 +236,31 @@ public class BetterRemovalConfig implements IModConfig
         if(this.root == null)
         {
             List<IConfigEntry> children = new ArrayList<>();
+
+            // 容器开关：大类下按模组分子类
+            List<IConfigEntry> containerChildren = new ArrayList<>();
+            CONTAINER_CATEGORIES.forEach((category, keys) ->
+                    containerChildren.add(new CategoryEntry(category, leafEntries(keys))));
+            children.add(new CategoryEntry("containers", containerChildren));
+
+            // 实验性 / 通用
             CATEGORIES.forEach((category, keys) ->
-            {
-                List<IConfigEntry> entries = keys.stream()
-                        .map(key -> (IConfigEntry) (INT_DEFAULTS.containsKey(key)
-                                ? new IntegerEntry(this.intValues.get(key))
-                                : new BooleanEntry(this.values.get(key))))
-                        .toList();
-                children.add(new CategoryEntry(category, entries));
-            });
+                    children.add(new CategoryEntry(category, leafEntries(keys))));
+
             this.root = new RootEntry(children);
         }
         return this.root;
+    }
+
+    private List<IConfigEntry> leafEntries(List<String> keys)
+    {
+        return keys.stream()
+                .map(key -> (IConfigEntry) (INT_DEFAULTS.containsKey(key)
+                        ? new IntegerEntry(this.intValues.get(key))
+                        : LIST_DEFAULTS.containsKey(key)
+                                ? new ListEntry(this.listValues.get(key))
+                                : new BooleanEntry(this.values.get(key))))
+                .toList();
     }
 
     @Override
@@ -240,6 +283,16 @@ public class BetterRemovalConfig implements IModConfig
 
     @Override
     public ActionResult loadWorldConfig(Path path) {
+        return ActionResult.success();
+    }
+
+    /**
+     * UNIVERSAL 配置为客户端本地文件，任何玩家都可编辑。
+     * Configured 的默认实现返回 fail()，必须显式放行，否则界面提示 "no permission"。
+     */
+    @Override
+    public ActionResult canPlayerEdit(PlayerEntity player)
+    {
         return ActionResult.success();
     }
 
@@ -347,7 +400,6 @@ public class BetterRemovalConfig implements IModConfig
         }
     }
 
-
     public static class IntegerEntry implements IConfigEntry
     {
         private final IntegerValue value;
@@ -400,6 +452,57 @@ public class BetterRemovalConfig implements IModConfig
         }
     }
 
+    public static class ListEntry implements IConfigEntry
+    {
+        private final StringListValue value;
+
+        public ListEntry(StringListValue value)
+        {
+            this.value = value;
+        }
+
+        @Override
+        public List<IConfigEntry> getChildren()
+        {
+            return List.of();
+        }
+
+        @Override
+        public boolean isRoot()
+        {
+            return false;
+        }
+
+        @Override
+        public boolean isLeaf()
+        {
+            return true;
+        }
+
+        @Override
+        public IConfigValue<?> getValue()
+        {
+            return this.value;
+        }
+
+        @Override
+        public String getEntryName()
+        {
+            return this.value.getName();
+        }
+
+        @Override
+        public Text getTooltip()
+        {
+            return this.value.getComment();
+        }
+
+        @Override
+        public String getTranslationKey()
+        {
+            return this.value.getTranslationKey();
+        }
+    }
 
     public static class CategoryEntry implements IConfigEntry
     {

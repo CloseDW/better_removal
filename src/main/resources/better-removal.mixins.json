@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "common.mixin.client",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "MouseScrollMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
