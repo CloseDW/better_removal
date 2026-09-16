@@ -1,6 +1,7 @@
 package closedw.br;
 
 import closedw.br.command.BetterRemovalCommand;
+import closedw.br.container.ContainerRegistry;
 import closedw.br.experimental.SlotRules;
 import closedw.br.ftbultimine.FTBUltimineSupport;
 import closedw.br.networking.ExtractKeyStateManager;
@@ -28,8 +29,10 @@ public class BetterRemoval implements ModInitializer {
 
 		LOGGER.info("Loading Better Removal");
 
+		// 容器注册表：注册所有容器类型并做启动自检
+		ContainerRegistry.init();
 		OutputSlotExtractor.register();
-		// 实验性：读取手写槽位规则（内置 / 其它模组自声明 / 用户配置文件）
+		// 实验性：读取手写槽位规则
 		SlotRules.load();
 		ExtractKeyStateManager.registerServerHandlers();
 		ExtractionModeManager.registerServerHandlers();
