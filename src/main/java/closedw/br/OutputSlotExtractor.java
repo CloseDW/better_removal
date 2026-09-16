@@ -863,18 +863,62 @@ public final class OutputSlotExtractor {
 	}
 
 	/**
-	 * 使用 insertStack
-	 * 不使用offer，offer在背包放不下时会dropItem直接扔到地上
-	 * 额外限制：单次最多取出到物品堆叠上限，防止容器中存在超过堆叠上限的物品
-	 *  Vinery 苹果压榨器的输出槽 BUG被原样塞进玩家背包。
+	 * 把容器物品送入玩家背包，返回实际放入的数量。
+	 * 单次最多取到物品堆叠上限，防止容器中存在超过堆叠上限的物品（Vinery 苹果压榨器的输出槽）
+	 * 被原样塞进玩家背包。
 	 */
 	private static int tryTakeSlot(PlayerEntity player, ItemStack result) {
-		int maxCount = result.getMaxCount();
-		int takeCount = Math.min(result.getCount(), maxCount);
-		ItemStack toInsert = result.copy();
-		toInsert.setCount(takeCount);
-		player.getInventory().insertStack(toInsert);
-		return takeCount - toInsert.getCount();
+		int takeCount = Math.min(result.getCount(), result.getMaxCount());
+		ItemStack portion = result.copy();
+		portion.setCount(takeCount);
+		return insertIntoPlayerInventory(player, portion);
+	}
+
+	/**
+	 * 把 stack 放入玩家主背包（优先与同类堆叠合并，其次放入空槽），返回实际放入数量。
+	 * 不使用 PlayerInventory#insertStack / #offer：
+	 * - #offer 在背包放不下时会把物品丢到地上；
+	 * - #insertStack 在创造模式下背包放不下时会把传入堆叠清零并返回“成功”，
+	 *   直接按差值计算会把放不下的物品当成已取走而吞掉。
+	 * 这里只按真实容量放置，绝不多取。
+	 */
+	private static int insertIntoPlayerInventory(PlayerEntity player, ItemStack stack) {
+		if (stack.isEmpty()) {
+			return 0;
+		}
+		DefaultedList<ItemStack> main = player.getInventory().main;
+		int inventoryMax = player.getInventory().getMaxCountPerStack();
+		int remaining = stack.getCount();
+		// 1) 先与背包含同类物品的堆叠合并
+		for (int i = 0; i < main.size() && remaining > 0; i++) {
+			ItemStack existing = main.get(i);
+			if (existing.isEmpty() || !isSameItem(existing, stack)) {
+				continue;
+			}
+			int room = Math.min(existing.getMaxCount(), inventoryMax) - existing.getCount();
+			if (room <= 0) {
+				continue;
+			}
+			int move = Math.min(room, remaining);
+			existing.increment(move);
+			remaining -= move;
+		}
+		// 2) 再放入空槽
+		for (int i = 0; i < main.size() && remaining > 0; i++) {
+			if (!main.get(i).isEmpty()) {
+				continue;
+			}
+			int move = Math.min(Math.min(stack.getMaxCount(), inventoryMax), remaining);
+			ItemStack copy = stack.copy();
+			copy.setCount(move);
+			main.set(i, copy);
+			remaining -= move;
+		}
+		int inserted = stack.getCount() - remaining;
+		if (inserted > 0) {
+			player.getInventory().markDirty();
+		}
+		return inserted;
 	}
 
 	private static void finish(PlayerEntity player, World world, Runnable markDirty) {

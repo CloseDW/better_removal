@@ -16,6 +16,7 @@ public final class CookingPotSupport implements ContainerSupport {
 	private static final int[] INPUT_SLOTS = { 0, 1, 2, 3, 4, 5 };
 	private static final int[] FUEL_SLOTS = { 7 };
 	private static final int[] OUTPUT_SLOTS = { 8 };
+	private static final int[] RESTOCK_SLOTS = { 0, 1, 2, 3, 4, 5, 7 };
 
 	@Override
 	public String configKey() {
@@ -55,5 +56,11 @@ public final class CookingPotSupport implements ContainerSupport {
 			return null;
 		}
 		return INPUT_SLOTS;
+	}
+
+	@Override
+	public int[] restockSlots(BlockEntity blockEntity) {
+		// 碗槽（7）在默认的“输入槽 ∪ 燃料槽”之外，这里显式加入，让空碗能被补满
+		return RESTOCK_SLOTS;
 	}
 }
