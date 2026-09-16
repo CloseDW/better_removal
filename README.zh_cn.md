@@ -170,6 +170,29 @@ JSON 文件写法（一条规则的 `match` 用逗号分隔即可同时匹配多
 
 ---
 
+## 开发：添加一个容器
+
+所有容器支持都集中在 `closedw.br.container.ContainerRegistry`。注册表是唯一的真相来源：
+取出、放入、补货、FTB Ultimine 连锁以及 Jade 预览都只查询它。
+
+**普通容器**（方块实体实现了原版 `Inventory` 接口）只需在 `ContainerRegistry.registerAll()` 里加一条：
+
+```java
+reg(new SimpleContainerSupport("crusher", be -> be instanceof CrusherBlockEntity)
+        .extract(ExtractionMode.INPUT, 0).extract(ExtractionMode.OUTPUT, 1)
+        .deposit(ExtractionMode.INPUT, 0));
+```
+
+然后把配置键加到 `BetterRemovalConfig`（分组 + 默认值）和两个 `lang` 文件即可。
+`全部` 模式（所有槽位）、补货槽位（输入槽 ∪ 燃料槽）以及槽位读写层都会自动推导。
+
+**特殊容器**（不是 `Inventory`，或只能通过反射访问）需要为槽位表实现 `ContainerSupport`，
+并实现一个 `ContainerAccess` 负责读写，参考 `CookingPotSupport`/`CookingPotAccess` 和 `OvenSupport`。
+
+注册顺序即优先级；实验性的规则/自动探测适配器注册在最后，因此只会作用于没有被内置支持认领的容器。
+
+---
+
 ## 许可
 
 MIT License —— Copyright (c) 2026 CloseDW
