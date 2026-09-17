@@ -173,33 +173,6 @@ anything at all it prints `cannot detect` for that detector instead.
 
 ---
 
-## Development: adding a container
-
-Container support is centralized in `closedw.br.container.ContainerRegistry`. The registry is the single
-source of truth: extraction, deposit, restock, FTB Ultimine chaining and the Jade preview all query it.
-
-**A normal container** (a block entity implementing the vanilla `Inventory` interface) is one entry in
-`ContainerRegistry.registerAll()`:
-
-```java
-reg(new SimpleContainerSupport("crusher", be -> be instanceof CrusherBlockEntity)
-        .extract(ExtractionMode.INPUT, 0).extract(ExtractionMode.OUTPUT, 1)
-        .deposit(ExtractionMode.INPUT, 0));
-```
-
-Then add the config key to `BetterRemovalConfig` (group + default value) and to both `lang` files.
-That is all — `ALL` (every slot), restock slots (input ∪ fuel) and the slot read/write layer are
-derived automatically.
-
-**A special container** (not an `Inventory`, or reachable only through reflection) implements
-`ContainerSupport` for its slot tables plus a `ContainerAccess` for reading/writing, as
-`CookingPotSupport`/`CookingPotAccess` and `OvenSupport` do.
-
-Registry order is priority. The experimental rule/auto-detect adapters are registered last, so they only
-apply to containers that no built-in support claims. 
-
----
-
 ## License
 
 MIT License — Copyright (c) 2026 CloseDW
