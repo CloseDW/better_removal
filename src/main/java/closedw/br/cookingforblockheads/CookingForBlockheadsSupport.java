@@ -38,26 +38,6 @@ public final class CookingForBlockheadsSupport {
 	 */
 	private static final String CONFIG_CLASS = "net.blay09.mods.cookingforblockheads.CookingForBlockheadsConfig";
 
-	/**
-	 * 输入槽索引（0-2）
-	 */
-	private static final int[] INPUT_SLOTS = { 0, 1, 2 };
-
-	/**
-	 * 燃料槽索引（3）
-	 */
-	private static final int[] FUEL_SLOTS = { 3 };
-
-	/**
-	 * 输出槽索引（4-6）
-	 */
-	private static final int[] OUTPUT_SLOTS = { 4, 5, 6 };
-
-	/**
-	 * ALL模式槽位：输入+燃料+输出（不含加工格7-15与工具格16-19）
-	 */
-	private static final int[] ALL_SLOTS = { 0, 1, 2, 3, 4, 5, 6 };
-
 	private static final boolean LOADED = checkLoaded();
 
 	private static boolean checkLoaded() {
@@ -133,33 +113,5 @@ public final class CookingForBlockheadsSupport {
 		catch (Throwable t) {
 			return null;
 		}
-	}
-
-	/**
-	 * 获取烤炉的输入槽索引（0-2）。
-	 */
-	public static int[] getInputSlots() {
-		return INPUT_SLOTS;
-	}
-
-	/**
-	 * 获取烤炉的燃料槽索引（3）。
-	 */
-	public static int[] getFuelSlots() {
-		return FUEL_SLOTS;
-	}
-
-	/**
-	 * 获取烤炉的输出槽索引（4-6）。
-	 */
-	public static int[] getOutputSlots() {
-		return OUTPUT_SLOTS;
-	}
-
-	/**
-	 * 获取烤炉ALL模式的槽位（0-6，输入+燃料+输出）。
-	 */
-	public static int[] getAllSlots() {
-		return ALL_SLOTS;
 	}
 }

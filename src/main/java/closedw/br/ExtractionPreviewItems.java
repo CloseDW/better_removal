@@ -1,8 +1,11 @@
 package closedw.br;
 
-import closedw.br.container.ContainerAccess;
-import closedw.br.container.ContainerRegistry;
-import closedw.br.container.ContainerSupport;
+import closedw.br.container.support.ContainerAccess;
+import closedw.br.container.support.ContainerRegistry;
+import closedw.br.container.support.ContainerSupport;
+import closedw.br.slot.SlotSet;
+
+
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.item.ItemStack;
 
@@ -18,7 +21,7 @@ public final class ExtractionPreviewItems {
 	private ExtractionPreviewItems() {
 	}
 
-	public static List<ItemStack> collect(BlockEntity blockEntity, ExtractionMode mode) {
+	public static List<ItemStack> collect(BlockEntity blockEntity, SlotSet mode) {
 		ContainerSupport support = ContainerRegistry.find(blockEntity);
 		if (support == null || !support.enabled() || !support.allowInteraction(blockEntity)) {
 			return null;

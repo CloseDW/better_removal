@@ -9,7 +9,6 @@ import net.minecraft.world.World;
 
 /**
  * FarmersDelightRefabricated的兼容
- *
  * 使用反射访问，类加载 / 方法调用全部放在try/catch
  * 厨锅槽位布局（CookingPotBlockEntity）：
  *   0-5  输入槽（食材）
@@ -33,11 +32,6 @@ public final class FarmersDelightSupport {
 	 * 需要反射访问的方块实体类
 	 */
 	private static final String COOKING_POT_CLASS = "vectorwing.farmersdelight.common.block.entity.CookingPotBlockEntity";
-
-	/**
-	 * 木篮 /竹篮共用的方块实体类全名（BasketBlockEntity，Inventory）。
-	 */
-	private static final String BASKET_CLASS = "vectorwing.farmersdelight.common.block.entity.BasketBlockEntity";
 
 	private static final boolean LOADED = checkLoaded();
 
@@ -66,22 +60,6 @@ public final class FarmersDelightSupport {
 		}
 		try {
 			Class<?> clazz = Class.forName(COOKING_POT_CLASS);
-			return clazz.isInstance(blockEntity);
-		}
-		catch (Throwable t) {
-			return false;
-		}
-	}
-
-	/**
-	 * 判断给定方块是否为木篮 / 竹篮。
-	 */
-	public static boolean isBasket(BlockEntity blockEntity) {
-		if (!LOADED || blockEntity == null) {
-			return false;
-		}
-		try {
-			Class<?> clazz = Class.forName(BASKET_CLASS);
 			return clazz.isInstance(blockEntity);
 		}
 		catch (Throwable t) {

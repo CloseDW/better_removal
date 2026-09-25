@@ -1,0 +1,32 @@
+{
+  "_comment": "Farm & Charm. The dish slot of the pot and the roaster keeps the original FUEL preset semantics (it is a consumable slot).",
+  "containers": [
+    {
+      "_note": "Cooking Pot: 0-5 ingredients, 6 dish (consumable), 7 output",
+      "match": "farm_and_charm:cooking_pot, @net.satisfy.farm_and_charm.core.block.entity.CookingPotBlockEntity",
+      "config": "fc_cooking_pot",
+      "default": true,
+      "size": 8,
+      "extract": { "input": [0, 1, 2, 3, 4, 5], "fuel": [6], "output": [7] },
+      "deposit": { "input": [0, 1, 2, 3, 4, 5], "fuel": [6] }
+    },
+    {
+      "_note": "Roaster: 0-5 ingredients, 6 dish (consumable), 7 output",
+      "match": "farm_and_charm:roaster, @net.satisfy.farm_and_charm.core.block.entity.RoasterBlockEntity",
+      "config": "roaster",
+      "default": true,
+      "size": 8,
+      "extract": { "input": [0, 1, 2, 3, 4, 5], "fuel": [6], "output": [7] },
+      "deposit": { "input": [0, 1, 2, 3, 4, 5], "fuel": [6] }
+    },
+    {
+      "_note": "Stove: 1-3 ingredients, 4 fuel, 0 output",
+      "match": "farm_and_charm:stove, @net.satisfy.farm_and_charm.core.block.entity.StoveBlockEntity",
+      "config": "stove",
+      "default": true,
+      "size": 5,
+      "extract": { "input": [1, 2, 3], "fuel": [4], "output": [0] },
+      "deposit": { "input": [1, 2, 3], "fuel": [4] }
+    }
+  ]
+}

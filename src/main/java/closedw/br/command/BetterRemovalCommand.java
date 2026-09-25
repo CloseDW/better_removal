@@ -1,11 +1,8 @@
 package closedw.br.command;
 
-import closedw.br.ExtractionAction;
-import closedw.br.ExtractionMode;
-import closedw.br.ExtractionModeManager;
-import closedw.br.ModeState;
-import closedw.br.OutputSlotExtractor;
-import closedw.br.experimental.SlotRules;
+import closedw.br.behavior.InteractionModeManager;
+import closedw.br.container.rule.SlotRuleRegistry;
+
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.server.command.CommandManager;
@@ -14,15 +11,10 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
-import java.util.List;
-
 /**
- * /br 指令：
- *   /br extract output|input|fuel|all  取出模式（空手+修饰键右击）
- *   /br deposit input|fuel             放入模式（手持物品+修饰键右击）
- *   /br restock                        补货模式（空手+修饰键右击，从背包补充已有同类物品）
- *   /br reload                         重新读取容器槽位规则（改完 json / 配置后不用重启）
- *   /br now 或裸 /br                   显示当前模式
+ *{@code /br now}显示当前模式；
+ *{@code /br reload} 重新读取容器槽位规则。
+ * 模式本身一律通过模式键位的滚轮切换，不再提供指令入口。
  */
 public final class BetterRemovalCommand {
 
@@ -33,54 +25,16 @@ public final class BetterRemovalCommand {
 		var root = CommandManager.literal("br")
 				.requires(src -> src.getPlayer() != null);
 
-		var extract = CommandManager.literal("extract");
-		for (ExtractionMode mode : ExtractionMode.values()) {
-			extract.then(CommandManager.literal(mode.getName()).executes(ctx -> {
-				ServerPlayerEntity player = ctx.getSource().getPlayer();
-				if (player == null) {
-					return 0;
-				}
-				ExtractionModeManager.setState(player, new ModeState(ExtractionAction.EXTRACT, mode));
-				player.sendMessage(ExtractionModeManager.getStateMessage(new ModeState(ExtractionAction.EXTRACT, mode)), false);
-				return 1;
-			}));
-		}
-		root.then(extract);
-
-		var deposit = CommandManager.literal("deposit");
-		for (ExtractionMode mode : List.of(ExtractionMode.INPUT, ExtractionMode.FUEL)) {
-			deposit.then(CommandManager.literal(mode.getName()).executes(ctx -> {
-				ServerPlayerEntity player = ctx.getSource().getPlayer();
-				if (player == null) {
-					return 0;
-				}
-				ExtractionModeManager.setState(player, new ModeState(ExtractionAction.DEPOSIT, mode));
-				player.sendMessage(ExtractionModeManager.getStateMessage(new ModeState(ExtractionAction.DEPOSIT, mode)), false);
-				return 1;
-			}));
-		}
-		root.then(deposit);
-
-		root.then(CommandManager.literal("restock").executes(ctx -> {
-			ServerPlayerEntity player = ctx.getSource().getPlayer();
-			if (player == null) {
-				return 0;
-			}
-			ExtractionModeManager.setState(player, new ModeState(ExtractionAction.RESTOCK, ExtractionMode.ALL));
-			player.sendMessage(ExtractionModeManager.getStateMessage(new ModeState(ExtractionAction.RESTOCK, ExtractionMode.ALL)), false);
-			return 1;
-		}));
-
 		root.then(CommandManager.literal("reload").executes(ctx -> {
 			ServerPlayerEntity player = ctx.getSource().getPlayer();
 			if (player == null) {
 				return 0;
 			}
-			int count = SlotRules.reload();
-			// 配置改完后重新同步一次：模式滚轮据此决定是否显示"主动探测"
-			ExtractionModeManager.refreshClient(player);
-			if (!OutputSlotExtractor.isExperimentalEnabled()) {
-				player.sendMessage(Text.translatable("better-removal.message.rules_disabled")
+			int count = SlotRuleRegistry.reload();
+			// 规则变化会改变「主动探测」是否可用，重新同步一次给客户端
+			InteractionModeManager.refreshClient(player);
+			if (count == 0) {
+				player.sendMessage(Text.translatable("better-removal.message.rules_empty")
 						.formatted(Formatting.RED), false);
 			}
 			player.sendMessage(Text.translatable("better-removal.message.rules_reloaded", count)
@@ -93,7 +47,7 @@ public final class BetterRemovalCommand {
 			if (player == null) {
 				return 0;
 			}
-			player.sendMessage(ExtractionModeManager.getStateMessage(ExtractionModeManager.getState(player)), false);
+			player.sendMessage(InteractionModeManager.getStateMessage(InteractionModeManager.getState(player)), false);
 			return 1;
 		};
 		root.then(CommandManager.literal("now").executes(show));

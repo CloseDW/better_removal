@@ -17,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -24,7 +25,9 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 /**
- * Better Removal的配置：为每种容器提供ON/OFF
+ * Better Removal的配置：为每种容器提供ON/OFF。
+ * 容器开关的清单不再写死在这里——容器的槽位布局由 json 规则描述，
+ * 所以分组与键在规则加载后由 {@link #registerRuleContainers} 动态登记。
  */
 public class BetterRemovalConfig implements IModConfig
 {
@@ -39,6 +42,7 @@ public class BetterRemovalConfig implements IModConfig
 
     /**
      * “容器开关”大类下的各模组子分组：子分组名->配置键列表。
+     * 由 {@link #registerRuleContainers} 按已加载的规则填充。
      */
     public static final Map<String, List<String>> CONTAINER_CATEGORIES = new LinkedHashMap<>();
 
@@ -61,27 +65,43 @@ public class BetterRemovalConfig implements IModConfig
      * 带说明文案（{@code config.<modid>.<key>.tooltip}）的布尔开关。
      * 只有列在这里的键才会把 tooltip 交给 Configured，避免缺文案时界面显示原始翻译键。
      */
-    public static final Set<String> TOOLTIP_KEYS = Set.of(
-            "experimental_auto_detect", "experimental_transfer_probe");
+    public static final Set<String> TOOLTIP_KEYS = new LinkedHashSet<>(List.of(
+            "experimental_auto_detect", "experimental_transfer_probe"));
+
+    /**
+     * 声明式规则里的「模组命名空间 → 容器开关分组」映射。
+     * 分组名同时用作 {@code config.better-removal.category.<分组>} 的翻译键。
+     * 没列在这里的命名空间会归到 {@code rules} 分组，用模组自己的显示名。
+     */
+    private static final Map<String, String> NAMESPACE_TO_GROUP = new LinkedHashMap<>();
+
+    /**
+     * 不依赖任何模组就始终显示的分组。
+     * <p>
+     * {@code vanilla} 是原版容器（原版永远存在）；{@code rules} 是兜底分组，装的是
+     * 命名空间推不出来的规则（例如只按 {@code @类名前缀} 匹配的），没有对应的模组可查。
+     * 其余分组名都是模组命名空间，按"模组是否安装"过滤。
+     */
+    private static final Set<String> ALWAYS_VISIBLE_GROUPS = Set.of("vanilla", "rules");
 
     static
     {
-        // 三个顶层大类：容器开关 / 实验性 / 通用；“容器开关”下再按模组分子类
-        CONTAINER_CATEGORIES.put("vanilla", List.of(
-                "furnace", "blast_furnace", "smoker", "brewing_stand",
-                "hopper", "dispenser", "dropper"));
-        CONTAINER_CATEGORIES.put("farmersdelight", List.of("cooking_pot", "basket"));
-        CONTAINER_CATEGORIES.put("ad_astra", List.of("compressor", "etrionic_blast_furnace", "fuel_refinery", "oxygen_loader", "cryo_freezer"));
-        CONTAINER_CATEGORIES.put("crabbersdelight", List.of("crab_trap"));
-        CONTAINER_CATEGORIES.put("aether", List.of("freezer", "altar"));
-        CONTAINER_CATEGORIES.put("vinery", List.of("fermentation_barrel", "apple_press"));
-        CONTAINER_CATEGORIES.put("fossil", List.of("analyzer", "sifter", "culture_vat", "worktable"));
-        CONTAINER_CATEGORIES.put("cookingforblockheads", List.of("oven"));
-        CONTAINER_CATEGORIES.put("farm_and_charm", List.of("fc_cooking_pot", "roaster", "stove"));
+        NAMESPACE_TO_GROUP.put("minecraft", "vanilla");
+        NAMESPACE_TO_GROUP.put("farmersdelight", "farmersdelight");
+        NAMESPACE_TO_GROUP.put("ad_astra", "ad_astra");
+        NAMESPACE_TO_GROUP.put("crabbersdelight", "crabbersdelight");
+        NAMESPACE_TO_GROUP.put("aether", "aether");
+        NAMESPACE_TO_GROUP.put("vinery", "vinery");
+        NAMESPACE_TO_GROUP.put("fossil", "fossil");
+        NAMESPACE_TO_GROUP.put("cookingforblockheads", "cookingforblockheads");
+        NAMESPACE_TO_GROUP.put("farm_and_charm", "farm_and_charm");
+        NAMESPACE_TO_GROUP.put("ironfurnaces", "ironfurnaces");
 
+        // 三个顶层大类：容器开关 / 实验性 / 通用
+        // 「容器开关」下的分组与每个分组的键由注册的规则推导，见 registerRuleContainers
         CATEGORIES.put("experimental", List.of(
-                "experimental_auto_detect", "experimental_auto_detect_whitelist",
-                "experimental_transfer_probe", "experimental_slot_rules"));
+                "experimental_auto_detect", "auto_detect_whitelist",
+                "experimental_transfer_probe", "slot_rules"));
 
         CATEGORIES.put("general", List.of(
                 "jade_preview", "ftb_ultimine", "deposit", "restock", "ftb_ultimine_max_containers"));
@@ -91,33 +111,6 @@ public class BetterRemovalConfig implements IModConfig
         DEFAULT_VALUES.put("ftb_ultimine", true);
         DEFAULT_VALUES.put("deposit", true);
         DEFAULT_VALUES.put("restock", true);
-        DEFAULT_VALUES.put("furnace", true);
-        DEFAULT_VALUES.put("blast_furnace", true);
-        DEFAULT_VALUES.put("smoker", true);
-        DEFAULT_VALUES.put("brewing_stand", true);
-        DEFAULT_VALUES.put("hopper", true);
-        DEFAULT_VALUES.put("dispenser", true);
-        DEFAULT_VALUES.put("dropper", true);
-        DEFAULT_VALUES.put("cooking_pot", true);
-        DEFAULT_VALUES.put("basket", true);
-        DEFAULT_VALUES.put("compressor", true);
-        DEFAULT_VALUES.put("etrionic_blast_furnace", true);
-        DEFAULT_VALUES.put("fuel_refinery", true);
-        DEFAULT_VALUES.put("oxygen_loader", true);
-        DEFAULT_VALUES.put("cryo_freezer", true);
-        DEFAULT_VALUES.put("crab_trap", true);
-        DEFAULT_VALUES.put("freezer", true);
-        DEFAULT_VALUES.put("altar", true);
-        DEFAULT_VALUES.put("fermentation_barrel", true);
-        DEFAULT_VALUES.put("apple_press", true);
-        DEFAULT_VALUES.put("analyzer", true);
-        DEFAULT_VALUES.put("sifter", true);
-        DEFAULT_VALUES.put("culture_vat", true);
-        DEFAULT_VALUES.put("worktable", true);
-        DEFAULT_VALUES.put("oven", true);
-        DEFAULT_VALUES.put("fc_cooking_pot", true);
-        DEFAULT_VALUES.put("roaster", true);
-        DEFAULT_VALUES.put("stove", true);
 
         // 实验性：通用容器槽位自动探测，默认关闭；开启后必须配置白名单才生效
         DEFAULT_VALUES.put("experimental_auto_detect", false);
@@ -128,10 +121,10 @@ public class BetterRemovalConfig implements IModConfig
         // FTB Ultimine连锁取出单次最多容器数量（64）
         INT_DEFAULTS.put("ftb_ultimine_max_containers", 64);
 
-        LIST_DEFAULTS.put("experimental_auto_detect_whitelist", List.of());
+        LIST_DEFAULTS.put("auto_detect_whitelist", List.of());
 
-        // 实验性：手写槽位规则，每条一条 "匹配串 角色=槽位..."
-        LIST_DEFAULTS.put("experimental_slot_rules", List.of());
+        // 声明式槽位规则，每条一条 "匹配串 角色=槽位..."；不受实验性总开关约束
+        LIST_DEFAULTS.put("slot_rules", List.of());
     }
 
     private final Map<String, BooleanValue> values = new LinkedHashMap<>();
@@ -257,6 +250,93 @@ public class BetterRemovalConfig implements IModConfig
         catch(IOException e)
         {
             LOGGER.error("Failed to save config to {}", path, e);
+        }
+    }
+
+    /**
+     * 按已注册的声明式规则登记「容器开关」分组与每个容器的开关键。
+     * 容器的槽位布局现在由 json 规则描述，代码里不再有这些容器的一份清单，
+     * 所以 Configured 里能出现哪些开关完全取决于实际加载到了哪些规则。
+     * <p>
+     * 同时按<b>已安装的模组</b>过滤：只显示对应模组真的装了的开关，
+     * 没装的模组（例如没装 Iron Furnaces）不会在界面里留下一个永远用不到的分类。
+     * @param configKeys 配置键 → 默认值
+     * @param declaredGroups 配置键 → 该规则的分组名（已按 {@code group} 字段 / 命名空间解析过）
+     */
+    public void registerRuleContainers(Map<String, Boolean> configKeys, Map<String, String> declaredGroups)
+    {
+        Map<String, List<String>> groups = new LinkedHashMap<>();
+        configKeys.forEach((key, defaultValue) ->
+        {
+            if(key == null || key.isBlank())
+            {
+                return;
+            }
+            String declared = declaredGroups.get(key);
+            String group = declared == null || declared.isBlank()
+                    ? "rules"
+                    : NAMESPACE_TO_GROUP.getOrDefault(declared, declared);
+
+            // 值定义始终登记（老配置里的键要能保留、机器翻译不了也不能丢），只是界面不显示
+            DEFAULT_VALUES.putIfAbsent(key, defaultValue);
+            // 已经有值的键（老配置 / 上一次 reload）保持原值，只补上缺失的定义
+            if(!this.values.containsKey(key))
+            {
+                this.values.put(key, new BooleanValue(key, defaultValue, defaultValue, TOOLTIP_KEYS.contains(key)));
+            }
+
+            if(!isGroupVisible(group))
+            {
+                return;
+            }
+            groups.computeIfAbsent(group, name -> new ArrayList<>()).add(key);
+        });
+
+        if(groups.isEmpty())
+        {
+            return;
+        }
+        // 合并进已有的分组（重复 reload 时不能把上一轮的键丢掉）
+        groups.forEach((group, keys) ->
+        {
+            List<String> existing = CONTAINER_CATEGORIES.computeIfAbsent(group, name -> new ArrayList<>());
+            for(String key : keys)
+            {
+                if(!existing.contains(key))
+                {
+                    existing.add(key);
+                }
+            }
+        });
+        // 分组变了，Configured 的界面缓存必须作废
+        this.root = null;
+    }
+
+    /**
+     * 该分组是否应该在「容器开关」里显示。
+     * <p>
+     * 分组名就是模组命名空间（原版是 {@code vanilla}，其它是 mod id），所以除了这几个
+     * 不依赖模组的分组之外，一律要求对应模组已安装——没装的模组不该在配置界面里留一个空分类。
+     */
+    private static boolean isGroupVisible(String group)
+    {
+        if(ALWAYS_VISIBLE_GROUPS.contains(group))
+        {
+            return true;
+        }
+        return isModLoaded(group);
+    }
+
+    private static boolean isModLoaded(String modId)
+    {
+        try
+        {
+            return FabricLoader.getInstance().isModLoaded(modId);
+        }
+        catch(Throwable t)
+        {
+            // 查询失败时按"装了"处理，宁可多显示也不要静默把开关藏起来
+            return true;
         }
     }
 

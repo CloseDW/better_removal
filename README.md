@@ -2,174 +2,137 @@
 
 English | [中文](README.zh_cn.md)
 
-Fabric 1.20.1: Hold **Left Alt** (rebindable) and **right-click** a container to directly extract its items into your inventory — **without opening the GUI**.
+Fabric 1.20.1: hold **Left Alt** (rebindable) and **right-click** a container to move items in or
+out of it — **without opening its GUI**.
+- **Empty hands** = extract; **holding an item** = deposit.
+- Hold the **mode key** and scroll to switch presets; release to apply:
 
-## Modes
+| Preset | Effect |
+|---|---|
+| Extract · Output (default) | Extracts output slots only |
+| Extract · Input / Fuel / All | Extracts the named slots |
+| Deposit · Input / Fuel | Deposits into the named slots |
+| Restock | Refills input/fuel slots with matching items from your inventory (empty slots are skipped) |
 
-Hold **Left Alt** (rebindable) and right-click:
+Deposits respect the container's own slot filters (a furnace's fuel slot only accepts fuel).
 
-- **Empty hands** to **extract** (or **restock** from your inventory);
-- **Holding an item** to **deposit** that item into supported containers.
-
-Pick a preset with the **Mode** keybinding (hold it, scroll to move through the 7 presets, release to apply; **unbound by default**) or the `/br` command:
-
-| Preset | Command | Effect |
-|---|---|---|
-| Extract · Output (default) | `/br extract output` | Extracts output slots only |
-| Extract · Input | `/br extract input` | Extracts input slots only |
-| Extract · Fuel | `/br extract fuel` | Extracts fuel slots only |
-| Extract · All | `/br extract all` | Extracts every slot |
-| Deposit · Input | `/br deposit input` | Deposits into input slots |
-| Deposit · Fuel | `/br deposit fuel` | Deposits into fuel slots |
-| Restock | `/br restock` | Refills input/fuel slots with matching items from your inventory (empty slots are skipped) |
-
-- `/br now` — shows your current preset.
-- `/br` (no arguments) — same as `/br now`.
-- Container slot filters are respected when depositing (e.g. a furnace's fuel slot only accepts fuel).
+| Command | Effect |
+|---|---|
+| `/br` or `/br now` | Shows your current preset |
+| `/br reload` | Re-reads the slot rules (no restart needed after editing config) |
 
 ## Supported Containers
 
-### Extraction & Deposit
+Slot layouts are data-driven from `better-removal/containers/*.json` (see the next section), so this
+is what the built-in rules cover.
 
-| Container                          | Extract | Deposit (Input / Fuel) |
-|------------------------------------|---------|--------------|
-| Furnace / Blast Furnace / Smoker   | yes     | input slot / fuel slot |
-| Brewing Stand                      | yes     | ingredient / blaze powder |
-| Hopper / Dispenser / Dropper       | yes     | every slot   |
-| Farmer's Delight Basket            | yes     | every slot   |
-| Farmer's Delight Cooking Pot       | yes     | input        |
-| Cooking for Blockheads Oven        | yes     | input / fuel |
-| Ad Astra Compressor                | yes     | input        |
-| Ad Astra Etrionic Blast Furnace    | yes     | inputs       |
-| Ad Astra Fuel Refinery             | yes     | fluid + item inputs |
-| Ad Astra Oxygen Loader             | yes     | fluid + item inputs |
-| Ad Astra Cryo Freezer              | yes     | inputs       |
-| Crabber's Delight Crab Trap        | yes     | bait slot    |
-| The Aether Freezer / Altar         | yes     | input / fuel |
-| Vinery Fermentation Barrel         | yes     | inputs / wine bottle |
-| Vinery Apple Press                 | yes     | inputs / wine bottle |
-| Farm & Charm Cooking Pot           | yes     | input / bowl |
-| Farm & Charm Roaster               | yes     | input / bowl |
-| Farm & Charm Stove                 | yes     | input / fuel |
-| Fossils and Archeology Analyzer    | yes     | inputs       |
-| Fossils and Archeology Sifter      | yes     | input        |
-| Fossils and Archeology Culture Vat | yes     | input / fuel |
-| Fossils and Archeology Worktable   | yes     | input / fuel |
+| Container | Extract | Deposit (Input / Fuel) |
+|---|---|---|
+| Furnace · Blast Furnace · Smoker | yes | input / fuel |
+| Brewing Stand | yes | ingredient / blaze powder |
+| Hopper · Dispenser · Dropper | yes | every slot |
+| Farmer's Delight Basket | yes | every slot |
+| Farmer's Delight Cooking Pot ※ | yes | input |
+| Cooking for Blockheads Oven ※ | yes | input / fuel |
+| Ad Astra Compressor · Etrionic Blast Furnace · Fuel Refinery · Oxygen Loader · Cryo Freezer | yes | inputs (refinery/loader include fluid inputs) |
+| Crabber's Delight Crab Trap | yes | bait |
+| The Aether Freezer · Altar | yes | input / fuel |
+| Vinery Fermentation Barrel · Apple Press | yes | inputs / wine bottle |
+| Farm & Charm Cooking Pot · Roaster | yes | input / dish |
+| Farm & Charm Stove | yes | input / fuel |
+| Fossils and Archeology Analyzer | yes | inputs |
+| Fossils and Archeology Sifter | yes | input |
+| Fossils and Archeology Culture Vat · Worktable | yes | input / fuel |
+| Iron Furnaces (all tiers) | yes | input / fuel |
 
----
-
-## Configuration
-
-Edit via the **Configured** mod
-
----
+> ※ These two are the only containers that **must stay hardcoded**: their block entities do not
+> implement vanilla `Inventory`, so their slots cannot be addressed by a rule.
 
 ## Compatibility
 
-### FTB Ultimine
+**FTB Ultimine**: hold the modifier *and* the Ultimine key while right-clicking to operate on every
+supported container in the current chain shape. (Required on both sides — key state and chain shape
+are server-side.)
 
-With **FTB Ultimine** installed, holding **both** keys — the Better Removal modifier (Left Alt, rebindable) **and** the Ultimine key (default `~`) — while right-clicking a supported container operates on **every supported container in the current Ultimine shape**.
-> Note: FTB Ultimine must be installed on both the client and the server, since the key state and the chain shape are managed server-side.
+**Jade**: hold the modifier and look at a container to preview what would be extracted or deposited.
+A chain shows the combined items of all chained containers. Toggle it with **Jade Preview** in the
+config. (Real contents need Jade on both sides.)
 
-### Jade
+## Configuration
 
-With **Jade** installed, holding the modifier key while looking at a supported container shows a highlighted preview in the tooltip — the items that would be extracted (empty hands) or the item that would be deposited (holding an item in deposit mode). When an FTB Ultimine chain extraction would trigger, the preview shows the combined items of all chained containers. This can be toggled via the **Jade Preview** option in the Configured config.
-
-> Note: For the extraction preview to show real container contents, **Jade must be installed on both the client and the server**.
+Edit via the **Configured** mod. Every container is enabled by default, and only the mods you
+actually have installed show up as categories.
 
 ---
 
-## Experimental: generic container support
+## Adding Container Support
 
-Beyond the built-in per-mod support there is an **experimental** path that makes *any* container
-usable without per-mod code. It is **off by default** and has three parts: **declared slot rules**,
-**auto-detection**, and the **active probe mode** that writes you a rule to copy.
+To support a container that is not covered, you do not need code changes or a mod update — write one
+line in the Configured `Declared container slot rules` list. Declared rules are explicit
+declarations, so they are **always active** and unaffected by the experimental switches.
 
-| Option (Configured) | Default | Meaning                                                         |
-| --- | --- |-----------------------------------------------------------------|
-| `Auto-detect containers (Experimental)` | off | Master switch for the whole feature                             |
-| `Auto-detect whitelist` | empty | Only the blocks listed here are auto-detected (mod_id:block_id) |
-| `Active probe mode (Experimental)` | off | Adds an *Active Probe* entry to the mode wheel                  |
-| `Container slot rules` | empty | Hand-written slot maps, one rule per line                       |
-
-### 1. Declared slot rules
-
-A rule says exactly what each slot of a container is. Rules come from three places, highest priority
-first:
-
-1. `Container slot rules` in Configured — one rule per line;
-2. `config/better-removal/containers/*.json`;
-3. `better-removal/containers/*.json` inside a mod jar.
-
-Configured line format — slots are comma-separated and `*` means every slot:
+### One-line format
 
 ```
 ironfurnaces input=0 fuel=1 output=2
 somemod:crusher,somemod:grinder input=* output=9,10
 ```
 
-JSON file format (one rule may target several blocks by separating the `match` with commas):
+Slots are comma-separated and `*` means every slot. Roles are `input`, `fuel`, `output`, `ignore`.
+Later assignments win, so `output=* ignore=5` means "everything is output except slot 5". A rule
+written wrong is skipped, and the reason is logged.
+
+### JSON format
+
+Used for built-in compatibility and mod self-declaration, as `better-removal/containers/*.json`:
 
 ```json
 {
   "containers": [
-    { "match": "somemod:crusher", "input": [0, 1], "fuel": [2], "output": [3, 4], "ignore": [5] },
-    { "match": "somemod:trash_can", "ignore": "*" }
+    {
+      "match": "somemod:crusher, @somemod.common.block.entity.CrusherBlockEntity",
+      "config": "crusher",
+      "size": 4,
+      "extract": { "input": [0, 1], "fuel": [2], "output": [3] },
+      "deposit": { "input": [0, 1], "fuel": [2] }
+    }
   ]
 }
 ```
 
-Roles are `input`, `fuel`, `output` and `ignore`. Later assignments win, so
-`"output": "*", "input": [1]` means "everything is output except slot 1". Out-of-range slot numbers
-are ignored, and a rule that is written wrong is skipped. `/br reload` re-reads all rule files and the
-Configured list.
+| Field | Required | Meaning |
+| --- | --- | --- |
+| `match` | yes | Match patterns; several separated by commas, any hit counts as a match |
+| `extract` / `deposit` | `extract` required | Slot maps for each direction; only split them when the two differ |
+| `config` | no | Configured switch key; omit it for a rule with no switch |
+| `group` | no | Switch group; inferred from the `match` namespace, and **required** when `match` only uses `@class` |
+| `default` | no | Default value of that switch (defaults to `true`) |
+| `size` | no | Total slot count; enables out-of-range checks at startup and mismatch warnings at runtime |
+| `sided` | no | `true` to also require `canExtract` before extracting |
 
-On first run an `example.json` template is written to `config/better-removal/containers/`.
+> Only rules with a `config` key show up in Configured, and only those can be turned off.
 
-### 2. Auto-detection (fallback guess)
+### Self-checks
 
-Only blocks listed in the **whitelist** are auto-detected.
+Applied after `/br reload`. While loading rules the mod logs: a block id that does not exist, a
+config key used by several rules, slot numbers beyond the declared `size`, and rules that declare no
+slots at all.
 
-Two detectors run in order:
+### Experimental: auto-detection
 
-1. **GUI menu, read-only.** Builds the container's own menu and reads what the mod author declared
-   (can insert / can take / slot visible / stack limit).
-2. **Vanilla inventory interface.** Fallback that just asks `Inventory.isValid` with a few common
-   items and checks `SidedInventory.canExtract`.
+Instead of writing a rule, you can let the mod guess. Off by default; enable `Auto-detect containers`
+and add blocks to the whitelist.
 
-Results (and the detector used, e.g. `menu`, `inventory`) are printed to the log as
-`[auto-detect] <block> -> 0=INPUT 1=FUEL 2=OUTPUT ...`, so you can check what it decided before
-trusting it.
+- **Auto-detection**: reads the container's own GUI menu first, then falls back to
+  `Inventory.isValid` heuristics. The result is logged as
+  `[container] <block> -> 0=INPUT 1=FUEL 2=OUTPUT ...` so you can check before trusting it.
+- **Active probe mode**: adds an *Active Probe* entry to the mode wheel. Hold the modifier and
+  right-click any container and both detectors run, each printing one click-to-copy rule string you
+  can paste straight into Configured.
 
-### 3. Active probe mode (write a rule by hand, quickly)
-
-With `Active probe mode` on, the mode wheel grows one extra entry: **Active Probe**. Hold the modifier
-and right-click any container in that mode and the server runs both detectors above, each printing two
-click-to-copy lines — **JSON** and **Rule** (the Configured `Container slot rules` format):
-
-```
-Active probe: somemod:crusher
-(1) Menu, read-only
-  JSON: {"match":"somemod:crusher","input":[0,1],"fuel":[2],"output":[3]}
-  Rule: somemod:crusher input=0,1 fuel=2 output=3
-(2) Inventory interface
-  JSON: {"match":"somemod:crusher","output":[3,4]}
-  Rule: somemod:crusher output=3,4
-```
-
-Paste the JSON line into a file under `config/better-removal/containers/`, or the Rule line into the
-Configured `Container slot rules` list; it applies after `/br reload`. If a detector cannot work out
-anything at all it prints `cannot detect` for that detector instead.
-
-### 4. Scope and limits
-
-- Unusual layouts are fine as long as the slots can be numbered: several inputs and several outputs
-  are just more numbers in the same rule (Ad Astra's Fuel Refinery, cooking pots, ovens), and a
-  machine with no fuel slot simply has no `fuel` entry.
-- What a rule cannot reach is a container the game cannot address slot by slot: a block entity that
-  does not implement `Inventory` at all, or a GUI whose slots point at a private inner container
-  instead of the block entity itself (Farmer's Delight's cooking pot, Cooking for Blockheads' oven).
-  Those keep their dedicated built-in support.
+The only containers a rule cannot reach are those the game cannot address slot by slot: a block
+entity that does not implement `Inventory`, or a GUI whose slots point at a private inner container.
+Those keep their dedicated built-in support.
 
 ---
 

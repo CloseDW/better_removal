@@ -1,12 +1,17 @@
 package closedw.br;
 
+import closedw.br.behavior.InteractionModeManager;
 import closedw.br.command.BetterRemovalCommand;
-import closedw.br.container.ContainerRegistry;
-import closedw.br.experimental.SlotRules;
+import closedw.br.config.BetterRemovalConfig;
+import closedw.br.container.rule.SlotRuleRegistry;
+import closedw.br.container.support.ContainerRegistry;
 import closedw.br.ftbultimine.FTBUltimineSupport;
 import closedw.br.networking.ExtractKeyStateManager;
+
+
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 
 import net.minecraft.util.Identifier;
 
@@ -29,13 +34,21 @@ public class BetterRemoval implements ModInitializer {
 
 		LOGGER.info("Loading Better Removal");
 
-		// 容器注册表：注册所有容器类型并做启动自检
+		// 容器注册表：注册所有容器类型
 		ContainerRegistry.init();
 		OutputSlotExtractor.register();
-		// 实验性：读取手写槽位规则
-		SlotRules.load();
+		// 槽位规则：读取声明式规则（内置 json / 其它模组自声明）并做自检
+		SlotRuleRegistry.load();
+		// 规则里的容器开关由规则推导，所以要在规则读完之后再登记进配置
+		BetterRemovalConfig.get().registerRuleContainers(
+				SlotRuleRegistry.configKeys(), SlotRuleRegistry.configGroups());
+		// 容器注册自检必须在这之后跑：配置项建好之前检查"配置键是否存在"会全部误报
+		ContainerRegistry.validate();
+		// 方块 ID 的存在性校验要等注册表冻结（onInitialize 阶段各模组的方块还在注册中途），
+		// 所以放到服务器启动时再跑
+		ServerLifecycleEvents.SERVER_STARTING.register(server -> SlotRuleRegistry.revalidateBlockIds());
 		ExtractKeyStateManager.registerServerHandlers();
-		ExtractionModeManager.registerServerHandlers();
+		InteractionModeManager.registerServerHandlers();
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
 				BetterRemovalCommand.register(dispatcher));
 

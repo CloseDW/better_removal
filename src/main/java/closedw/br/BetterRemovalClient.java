@@ -1,9 +1,11 @@
 package closedw.br;
 
+import closedw.br.behavior.InteractionMode;
+import closedw.br.behavior.InteractionModeManager;
 import closedw.br.client.ModeWheel;
-import closedw.br.networking.ExtractKeyStateC2SPacket;
-import closedw.br.networking.ExtractionModeSetC2SPacket;
 import closedw.br.networking.ExtractionModeSyncS2CPacket;
+import closedw.br.networking.ExtractKeyStateC2SPacket;
+
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
@@ -35,7 +37,7 @@ public class BetterRemovalClient implements ClientModInitializer {
 	public void onInitializeClient() {
 		// 接收服务端同步的取出/放入模式，以及"主动探测"是否可用
 		ClientPlayNetworking.registerGlobalReceiver(ExtractionModeSyncS2CPacket.TYPE, (packet, player, responseSender) ->
-				ExtractionModeManager.setClientState(new ModeState(packet.action(), packet.mode()), packet.probeAvailable()));
+				InteractionModeManager.setClientState(new InteractionMode(packet.behavior(), packet.slots()), packet.probeAvailable()));
 
 		registerModeKey();
 		registerExtractKey();

@@ -1,6 +1,7 @@
 package closedw.br.mixin.client;
 
 import closedw.br.client.ModeWheel;
+
 import net.minecraft.client.Mouse;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;

@@ -1,16 +1,24 @@
 package closedw.br;
 
+import closedw.br.behavior.Behavior;
+import closedw.br.behavior.InteractionMode;
+import closedw.br.behavior.InteractionModeManager;
 import closedw.br.config.BetterRemovalConfig;
-import closedw.br.container.ContainerAccess;
-import closedw.br.container.ContainerRegistry;
-import closedw.br.container.ContainerSupport;
+import closedw.br.container.detect.AutoDetectSupport;
+import closedw.br.container.detect.SlotProbeReport;
 import closedw.br.container.Stacks;
-import closedw.br.experimental.SlotProbeReport;
+import closedw.br.container.support.ContainerAccess;
+import closedw.br.container.support.ContainerRegistry;
+import closedw.br.container.support.ContainerSupport;
 import closedw.br.ftbultimine.FTBUltimineSupport;
 import closedw.br.networking.ExtractKeyStateManager;
+import closedw.br.slot.SlotSet;
+
+
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.inventory.Inventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.sound.SoundCategory;
@@ -137,7 +145,7 @@ public final class OutputSlotExtractor {
 	 * 连锁取出：遍历Ultimine连锁形状内的所有容器，逐个按当前模式取出。
 	 * 不适用的容器（未支持/被关闭）自动跳过。
 	 */
-	private static ActionResult handleChainExtraction(PlayerEntity player, World world, List<BlockPos> chain, ExtractionMode mode) {
+	private static ActionResult handleChainExtraction(PlayerEntity player, World world, List<BlockPos> chain, SlotSet mode) {
 		boolean any = false;
 		for (BlockPos pos : chain) {
 			BlockEntity blockEntity = world.getBlockEntity(pos);
@@ -153,7 +161,9 @@ public final class OutputSlotExtractor {
 			if (slots == null || access == null) {
 				continue;
 			}
-			if (takeSlots(player, access, slots)) {
+			// 规则可以要求额外校验「该槽位能否被取出」
+			boolean sided = AutoDetectSupport.ruleRequiresSidedCheck(blockEntity);
+			if (takeSlots(player, access, slots, blockEntity instanceof Inventory inventory ? inventory : null, sided)) {
 				access.markDirty();
 				any = true;
 			}
@@ -161,9 +171,8 @@ public final class OutputSlotExtractor {
 		if (!any) {
 			return ActionResult.PASS;
 		}
-		// 取物音效只播放一次，避免连锁时刷屏
-		finish(player, world, () -> {
-		});
+		// 取物音效只播放一次，避免连锁时刷屏（各容器的 markDirty 已在循环里逐个处理）
+		playPickupSound(player, world);
 		return ActionResult.SUCCESS;
 	}
 
@@ -171,7 +180,7 @@ public final class OutputSlotExtractor {
 	 * Jade预览：计算将要取出的物品。
 	 * 空手+按住修饰键+按住Ultimine键时聚合整个连锁形状内所有支持容器；否则单容器。
 	 */
-	public static List<ItemStack> collectPreview(PlayerEntity player, BlockEntity blockEntity, ExtractionMode mode) {
+	public static List<ItemStack> collectPreview(PlayerEntity player, BlockEntity blockEntity, SlotSet mode) {
 		boolean emptyHands = player.getMainHandStack().isEmpty() && player.getOffHandStack().isEmpty();
 		World world = blockEntity.getWorld();
 		// 空手 + 按住修饰键且连锁生效时，聚合整个连锁形状内所有支持容器的物品
@@ -213,11 +222,11 @@ public final class OutputSlotExtractor {
 			return ActionResult.PASS;
 		}
 
-		ModeState state = ExtractionModeManager.getState(player);
+		InteractionMode state = InteractionModeManager.getState(player);
 
 		// ---------- 主动探测（实验性）：槽位探测的结果打印到聊天框，不动容器 ----------
-		if (state.action() == ExtractionAction.PROBE) {
-			if (!ExtractionModeManager.isProbeAvailable()) {
+		if (state.behavior() == Behavior.PROBE) {
+			if (!InteractionModeManager.isProbeAvailable()) {
 				// 开关关掉后玩家可能还停在"主动探测"模式
 				return ActionResult.PASS;
 			}
@@ -241,25 +250,25 @@ public final class OutputSlotExtractor {
 				return ActionResult.PASS;
 			}
 			// 补货：从背包向容器输入/燃料槽补充已有同类物品（空槽不补）
-			if (state.action() == ExtractionAction.RESTOCK) {
+			if (state.behavior() == Behavior.RESTOCK) {
 				return handleRestock(player, world, hitResult.getBlockPos(), blockEntity);
 			}
 			// 放入预设下空手右击不动作
-			if (state.action() != ExtractionAction.EXTRACT) {
+			if (state.behavior() != Behavior.EXTRACT) {
 				return ActionResult.PASS;
 			}
-			return handleExtract(player, world, hitResult.getBlockPos(), blockEntity, state.mode());
+			return handleExtract(player, world, hitResult.getBlockPos(), blockEntity, state.slots());
 		}
 
 		// ---------- 放入（手持物品）----------
-		if (state.action() != ExtractionAction.DEPOSIT) {
+		if (state.behavior() != Behavior.DEPOSIT) {
 			return ActionResult.PASS;
 		}
 		if (!isContainerEnabled("deposit")) {
 			return ActionResult.PASS;
 		}
 		// 放入预设只有 input/fuel
-		if (state.mode() != ExtractionMode.INPUT && state.mode() != ExtractionMode.FUEL) {
+		if (state.slots() != SlotSet.INPUT && state.slots() != SlotSet.FUEL) {
 			return ActionResult.PASS;
 		}
 		ItemStack held = player.getMainHandStack();
@@ -270,7 +279,7 @@ public final class OutputSlotExtractor {
 		// FTB Ultimine连锁：一排容器一起放入
 		List<BlockPos> chain = getChainPositions(player, hitResult.getBlockPos());
 		if (chain != null) {
-			ActionResult chainResult = handleChainDeposit(player, world, chain, state.mode(), held);
+			ActionResult chainResult = handleChainDeposit(player, world, chain, state.slots(), held);
 			if (chainResult == ActionResult.SUCCESS) {
 				return ActionResult.SUCCESS;
 			}
@@ -285,7 +294,7 @@ public final class OutputSlotExtractor {
 		if (support == null || !support.enabled() || !support.allowInteraction(blockEntity)) {
 			return ActionResult.PASS;
 		}
-		int[] slots = support.depositSlots(blockEntity, state.mode());
+		int[] slots = support.depositSlots(blockEntity, state.slots());
 		ContainerAccess access = support.access(blockEntity);
 		if (slots == null || access == null) {
 			return ActionResult.PASS;
@@ -293,17 +302,16 @@ public final class OutputSlotExtractor {
 		if (!depositToContainer(access, slots, held)) {
 			return ActionResult.PASS;
 		}
-		finish(player, world, () -> {
-			access.markDirty();
-			player.getInventory().markDirty();
-		});
+		access.markDirty();
+		player.getInventory().markDirty();
+		playPickupSound(player, world);
 		return ActionResult.SUCCESS;
 	}
 
 	/**
 	 * 取出分支：连锁 → 单容器（统一走注册表）。
 	 */
-	private static ActionResult handleExtract(PlayerEntity player, World world, BlockPos pos, BlockEntity blockEntity, ExtractionMode mode) {
+	private static ActionResult handleExtract(PlayerEntity player, World world, BlockPos pos, BlockEntity blockEntity, SlotSet mode) {
 		// ---------- FTB Ultimine连锁取出 ----------
 		// 修饰键+空手再按住Ultimine键时，一次性取出整个连锁形状内所有支持容器的对应槽位
 		List<BlockPos> chain = getChainPositions(player, pos);
@@ -320,10 +328,13 @@ public final class OutputSlotExtractor {
 		if (slots == null || access == null) {
 			return ActionResult.PASS;
 		}
-		if (!takeSlots(player, access, slots)) {
+		// 规则可以要求额外校验「该槽位能否被取出」
+		boolean sided = AutoDetectSupport.ruleRequiresSidedCheck(blockEntity);
+		if (!takeSlots(player, access, slots, blockEntity instanceof Inventory inventory ? inventory : null, sided)) {
 			return ActionResult.PASS;
 		}
-		finish(player, world, access::markDirty);
+		access.markDirty();
+		playPickupSound(player, world);
 		return ActionResult.SUCCESS;
 	}
 
@@ -374,7 +385,7 @@ public final class OutputSlotExtractor {
 	 * 权重=槽位剩余容量（空槽按整组计、同类槽按剩余空间计）
 	 * 放不下的余量留在手上
 	 */
-	private static ActionResult handleChainDeposit(PlayerEntity player, World world, List<BlockPos> chain, ExtractionMode slotMode, ItemStack held) {
+	private static ActionResult handleChainDeposit(PlayerEntity player, World world, List<BlockPos> chain, SlotSet slotMode, ItemStack held) {
 		// 第一遍：收集所有能接收手持物品的槽位及其权重
 		List<DepositSlot> slots = new ArrayList<>();
 		Set<ContainerAccess> dirty = new LinkedHashSet<>();
@@ -454,8 +465,7 @@ public final class OutputSlotExtractor {
 		}
 		player.getInventory().markDirty();
 		// 放入音效只播放一次，避免连锁时刷屏
-		finish(player, world, () -> {
-		});
+		playPickupSound(player, world);
 		return ActionResult.SUCCESS;
 	}
 
@@ -484,7 +494,7 @@ public final class OutputSlotExtractor {
 	 * Jade放入预览：判断手持物品是否至少能放进一个目标槽位。
 	 * 会逐槽检查容量与过滤，全部放不下时不显示预览。
 	 */
-	public static boolean canDepositTo(BlockEntity blockEntity, ExtractionMode mode, ItemStack held) {
+	public static boolean canDepositTo(BlockEntity blockEntity, SlotSet mode, ItemStack held) {
 		if (blockEntity == null || held == null || held.isEmpty()) {
 			return false;
 		}
@@ -505,10 +515,7 @@ public final class OutputSlotExtractor {
 		return false;
 	}
 
-	// ------------------------------------------------------------------
 	// 补货
-	// ------------------------------------------------------------------
-
 	/**
 	 * 补货分支：从背包向容器输入槽和燃料槽补充已有同类物品（空槽不补）。
 	 */
@@ -537,8 +544,7 @@ public final class OutputSlotExtractor {
 		}
 		access.markDirty();
 		player.getInventory().markDirty();
-		finish(player, world, () -> {
-		});
+		playPickupSound(player, world);
 		return ActionResult.SUCCESS;
 	}
 
@@ -695,8 +701,7 @@ public final class OutputSlotExtractor {
 			access.markDirty();
 		}
 		player.getInventory().markDirty();
-		finish(player, world, () -> {
-		});
+		playPickupSound(player, world);
 		return ActionResult.SUCCESS;
 	}
 
@@ -837,19 +842,22 @@ public final class OutputSlotExtractor {
 		}
 	}
 
-	// ------------------------------------------------------------------
-	// 取物与工具
-	// ------------------------------------------------------------------
-
+	// 取物
 	/**
 	 * 从指定槽位取出物品到玩家背包。
+	 * @param inventory 该容器对应的原版容器视图；用于 sided 校验，可为 null
+	 * @param sided 是否额外经过「该槽位能否被取出」的校验（规则里的 sided 字段）
 	 * @return 是否取出了物品
 	 */
-	private static boolean takeSlots(PlayerEntity player, ContainerAccess access, int[] slots) {
+	private static boolean takeSlots(PlayerEntity player, ContainerAccess access, int[] slots, Inventory inventory, boolean sided) {
 		boolean takenAny = false;
 		for (int slot : slots) {
 			ItemStack result = access.get(slot);
 			if (result.isEmpty()) {
+				continue;
+			}
+			if (sided && !AutoDetectSupport.canExtract(inventory, slot, result)) {
+				// 容器明确声明这个槽位不允许被取出（升级槽/展示槽之类）
 				continue;
 			}
 			int taken = tryTakeSlot(player, result);
@@ -921,8 +929,7 @@ public final class OutputSlotExtractor {
 		return inserted;
 	}
 
-	private static void finish(PlayerEntity player, World world, Runnable markDirty) {
-		markDirty.run();
+	private static void playPickupSound(PlayerEntity player, World world) {
 		world.playSound(null, player.getBlockPos(), SoundEvents.ENTITY_ITEM_PICKUP, SoundCategory.PLAYERS, 0.2f, 1.0f);
 	}
 }

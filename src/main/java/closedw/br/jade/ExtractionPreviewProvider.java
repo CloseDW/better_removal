@@ -1,12 +1,13 @@
 package closedw.br.jade;
 
+import closedw.br.behavior.Behavior;
+import closedw.br.behavior.InteractionMode;
+import closedw.br.behavior.InteractionModeManager;
+import closedw.br.BetterRemoval;
 import closedw.br.BetterRemovalClient;
-import closedw.br.ExtractionAction;
-import closedw.br.ExtractionMode;
-import closedw.br.ExtractionModeManager;
 import closedw.br.ExtractionPreviewItems;
-import closedw.br.ModeState;
 import closedw.br.OutputSlotExtractor;
+
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
@@ -62,21 +63,21 @@ public class ExtractionPreviewProvider implements IBlockComponentProvider {
 			return;
 		}
 
-		ModeState state = ExtractionModeManager.getClientState();
+		InteractionMode state = InteractionModeManager.getClientState();
 
 		// 主动探测模式：不涉及取出/放入，不显示预览
-		if (state.action() == ExtractionAction.PROBE) {
+		if (state.behavior() == Behavior.PROBE) {
 			return;
 		}
 
 		// 放入模式：显示主手物品（无需服务端数据）
-		if (state.action() == ExtractionAction.DEPOSIT) {
+		if (state.behavior() == Behavior.DEPOSIT) {
 			ItemStack held = player.getMainHandStack();
 			if (held.isEmpty()) {
 				return;
 			}
 			// 槽位过滤/容量逐槽校验：全部放不下时不显示预览
-			if (!OutputSlotExtractor.canDepositTo(blockEntity, state.mode(), held)) {
+			if (!OutputSlotExtractor.canDepositTo(blockEntity, state.slots(), held)) {
 				return;
 			}
 			addBox(tooltip, Text.translatable("better-removal.jade.deposit").formatted(Formatting.GREEN), List.of(held));
@@ -84,7 +85,7 @@ public class ExtractionPreviewProvider implements IBlockComponentProvider {
 		}
 
 		// 补货模式：空手，显示可补充的已有物品（服务端下发，回退客户端本地计算）
-		if (state.action() == ExtractionAction.RESTOCK) {
+		if (state.behavior() == Behavior.RESTOCK) {
 			if (!player.getMainHandStack().isEmpty() || !player.getOffHandStack().isEmpty()) {
 				return;
 			}
@@ -132,7 +133,7 @@ public class ExtractionPreviewProvider implements IBlockComponentProvider {
 	/**
 	 * 优先读取服务端下发的真实物品；缺失时按行为回退到客户端本地读取
 	 */
-	private List<ItemStack> readItems(BlockAccessor accessor, BlockEntity blockEntity, ModeState state) {
+	private List<ItemStack> readItems(BlockAccessor accessor, BlockEntity blockEntity, InteractionMode state) {
 		NbtCompound serverData = accessor.getServerData();
 		if (serverData != null && serverData.contains(BetterRemovalServerData.DATA_KEY)) {
 			NbtList list = serverData.getList(BetterRemovalServerData.DATA_KEY, 10);
@@ -142,9 +143,9 @@ public class ExtractionPreviewProvider implements IBlockComponentProvider {
 			}
 			return items;
 		}
-		if (state.action() == ExtractionAction.RESTOCK) {
+		if (state.behavior() == Behavior.RESTOCK) {
 			return OutputSlotExtractor.collectRestockPreview(blockEntity, accessor.getPlayer());
 		}
-		return ExtractionPreviewItems.collect(blockEntity, state.mode());
+		return ExtractionPreviewItems.collect(blockEntity, state.slots());
 	}
 }
