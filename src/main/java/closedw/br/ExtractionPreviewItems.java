@@ -1,8 +1,12 @@
 package closedw.br;
 
-import closedw.br.cookingforblockheads.CookingForBlockheadsSupport;
-import closedw.br.farmersdelight.FarmersDelightSupport;
-import net.minecraft.world.Container;
+import closedw.br.container.access.MenuSlotAccess;
+import closedw.br.container.support.ContainerAccess;
+import closedw.br.container.support.ContainerRegistry;
+import closedw.br.container.support.ContainerSupport;
+import closedw.br.slot.SlotSet;
+
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
@@ -18,76 +22,33 @@ public final class ExtractionPreviewItems {
     private ExtractionPreviewItems() {
     }
 
-    public static List<ItemStack> collect(BlockEntity blockEntity, ExtractionMode mode) {
-        // 农夫乐事厨锅：通过反射访问其 ItemStackHandler
-        if (FarmersDelightSupport.isCookingPot(blockEntity)) {
-            if (!OutputSlotExtractor.isContainerEnabled("cooking_pot")) {
-                return null;
-            }
-            int[] slots;
-            if (mode == ExtractionMode.ALL) {
-                slots = new int[] { 0, 1, 2, 3, 4, 5, 6, 7, 8 };
-            }
-            else if (mode == ExtractionMode.OUTPUT) {
-                slots = new int[] { 8 };
-            }
-            else if (mode == ExtractionMode.INPUT) {
-                slots = new int[] { 0, 1, 2, 3, 4, 5 };
-            }
-            else {
-                slots = new int[] { 7 };
-            }
-            List<ItemStack> items = new ArrayList<>();
-            for (int slot : slots) {
-                ItemStack stack = FarmersDelightSupport.getSlot(null, blockEntity.getBlockPos(), blockEntity, slot);
-                if (stack != null && !stack.isEmpty()) {
-                    items.add(stack);
-                }
-            }
-            return items;
+    public static List<ItemStack> collect(Player player, BlockEntity blockEntity, SlotSet mode) {
+        ContainerSupport support = ContainerRegistry.find(blockEntity);
+        if (support == null || !support.enabled() || !support.allowInteraction(blockEntity)) {
+            return null;
         }
-
-        // 烤炉：反射拿内部容器（不是Container）
-        if (CookingForBlockheadsSupport.isOven(blockEntity)) {
-            if (!OutputSlotExtractor.isContainerEnabled("oven") || CookingForBlockheadsSupport.isAutomationDisallowed()) {
-                return null;
-            }
-            int[] slots = OutputSlotExtractor.getSlotsForMode(blockEntity, mode);
-            Container ovenContainer = CookingForBlockheadsSupport.getInternalContainer(blockEntity);
-            if (slots == null || ovenContainer == null) {
+        int[] slots = support.extractSlots(blockEntity, mode);
+        if (slots == null) {
+            return null;
+        }
+        try {
+            ContainerAccess access = support.access(blockEntity, player);
+            if (access == null) {
                 return null;
             }
             List<ItemStack> items = new ArrayList<>();
             for (int slot : slots) {
-                if (slot < 0 || slot >= ovenContainer.getContainerSize()) {
-                    continue;
-                }
-                ItemStack stack = ovenContainer.getItem(slot);
+                // 访问实现内部已做越界保护
+                ItemStack stack = access.get(slot);
                 if (!stack.isEmpty()) {
                     items.add(stack);
                 }
             }
             return items;
         }
-
-        int[] slots = OutputSlotExtractor.getSlotsForMode(blockEntity, mode);
-        if (slots == null) {
-            return null;
+        finally {
+            // 菜单槽位容器（手动指认映射）会临时构造菜单，读完全部关掉（只关这个玩家的）
+            MenuSlotAccess.closeAll(player);
         }
-        if (!(blockEntity instanceof Container container)) {
-            return null;
-        }
-
-        List<ItemStack> items = new ArrayList<>();
-        for (int slot : slots) {
-            if (slot < 0 || slot >= container.getContainerSize()) {
-                continue;
-            }
-            ItemStack stack = container.getItem(slot);
-            if (!stack.isEmpty()) {
-                items.add(stack);
-            }
-        }
-        return items;
     }
 }

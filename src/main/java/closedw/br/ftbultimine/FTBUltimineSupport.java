@@ -73,7 +73,7 @@ public final class FTBUltimineSupport {
                 cachedPositions = null;
             }
         }
-        INSTANCE_RESOLVER = instanceField != null ? instanceField : (Method) getInstance;
+        INSTANCE_RESOLVER = instanceField != null ? instanceField : getInstance;
         GET_PLAYER_DATA = getPlayerData;
         IS_PRESSED = isPressed;
         HAS_CACHED_POSITIONS = hasCachedPositions;

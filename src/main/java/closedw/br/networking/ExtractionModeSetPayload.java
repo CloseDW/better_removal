@@ -1,8 +1,8 @@
 package closedw.br.networking;
 
 import closedw.br.BetterRemoval;
-import closedw.br.ExtractionAction;
-import closedw.br.ExtractionMode;
+import closedw.br.behavior.Behavior;
+import closedw.br.slot.SlotSet;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -11,17 +11,17 @@ import net.minecraft.resources.ResourceLocation;
 /**
  * 客户端 -> 服务端：设置当前模式（行为+槽位）。
  */
-public record ExtractionModeSetPayload(ExtractionAction action, ExtractionMode mode) implements CustomPacketPayload {
+public record ExtractionModeSetPayload(Behavior behavior, SlotSet slots) implements CustomPacketPayload {
 
     public static final Type<ExtractionModeSetPayload> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(BetterRemoval.MODID, "mode_set"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, ExtractionModeSetPayload> CODEC =
             StreamCodec.composite(
-                    StreamCodec.of((buf, a) -> buf.writeEnum(a), buf -> buf.readEnum(ExtractionAction.class)),
-                    ExtractionModeSetPayload::action,
-                    StreamCodec.of((buf, m) -> buf.writeEnum(m), buf -> buf.readEnum(ExtractionMode.class)),
-                    ExtractionModeSetPayload::mode,
+                    StreamCodec.of((buf, a) -> buf.writeEnum(a), buf -> buf.readEnum(Behavior.class)),
+                    ExtractionModeSetPayload::behavior,
+                    StreamCodec.of((buf, s) -> buf.writeEnum(s), buf -> buf.readEnum(SlotSet.class)),
+                    ExtractionModeSetPayload::slots,
                     ExtractionModeSetPayload::new);
 
     @Override

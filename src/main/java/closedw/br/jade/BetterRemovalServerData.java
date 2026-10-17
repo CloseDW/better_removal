@@ -1,9 +1,9 @@
 package closedw.br.jade;
 
-import closedw.br.ExtractionAction;
-import closedw.br.ExtractionModeManager;
-import closedw.br.ModeState;
 import closedw.br.OutputSlotExtractor;
+import closedw.br.behavior.Behavior;
+import closedw.br.behavior.InteractionMode;
+import closedw.br.behavior.InteractionModeManager;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.resources.ResourceLocation;
@@ -39,12 +39,14 @@ public class BetterRemovalServerData implements IServerDataProvider<BlockAccesso
             return;
         }
 
-        ModeState state = ExtractionModeManager.getState(player);
+        InteractionMode state = InteractionModeManager.getState(player);
+        // 放入模式的预览不需要服务端数据（客户端直接显示主手物品）
         List<ItemStack> items;
-        if (state.action() == ExtractionAction.EXTRACT) {
-            items = OutputSlotExtractor.collectPreview(player, accessor.getBlockEntity(), state.mode());
+        if (state.behavior() == Behavior.EXTRACT) {
+            items = OutputSlotExtractor.collectPreview(player, accessor.getBlockEntity(), state.slots());
         }
-        else if (state.action() == ExtractionAction.RESTOCK) {
+        else if (state.behavior() == Behavior.RESTOCK) {
+            // 补货：服务端同时知道容器内容与玩家背包，直接算出可补物品
             items = OutputSlotExtractor.collectRestockPreview(accessor.getBlockEntity(), player);
         }
         else {

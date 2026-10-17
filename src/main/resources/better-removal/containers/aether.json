@@ -1,0 +1,23 @@
+{
+  "_comment": "The Aether. The Freezer and the Altar share the same layout; both extend the vanilla furnace.",
+  "containers": [
+    {
+      "_note": "Freezer: 0 input, 1 fuel, 2 output",
+      "match": "aether:freezer, @com.aetherteam.aether.blockentity.FreezerBlockEntity",
+      "config": "freezer",
+      "default": true,
+      "size": 3,
+      "extract": { "input": [0], "fuel": [1], "output": [2] },
+      "deposit": { "input": [0], "fuel": [1] }
+    },
+    {
+      "_note": "Altar: 0 input, 1 fuel, 2 output",
+      "match": "aether:altar, @com.aetherteam.aether.blockentity.AltarBlockEntity",
+      "config": "altar",
+      "default": true,
+      "size": 3,
+      "extract": { "input": [0], "fuel": [1], "output": [2] },
+      "deposit": { "input": [0], "fuel": [1] }
+    }
+  ]
+}

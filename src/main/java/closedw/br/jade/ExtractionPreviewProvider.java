@@ -2,11 +2,11 @@ package closedw.br.jade;
 
 import closedw.br.BetterRemoval;
 import closedw.br.BetterRemovalClient;
-import closedw.br.ExtractionAction;
-import closedw.br.ExtractionModeManager;
 import closedw.br.ExtractionPreviewItems;
-import closedw.br.ModeState;
 import closedw.br.OutputSlotExtractor;
+import closedw.br.behavior.Behavior;
+import closedw.br.behavior.InteractionMode;
+import closedw.br.behavior.InteractionModeManager;
 import net.minecraft.ChatFormatting;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -61,20 +61,22 @@ public class ExtractionPreviewProvider implements IBlockComponentProvider {
             return;
         }
 
-        ModeState state = ExtractionModeManager.getClientState();
+        InteractionMode state = InteractionModeManager.getClientState();
 
-        // 主动探测模式：不涉及取出/放入，不显示预览
-        if (state.action() == ExtractionAction.PROBE) {
+        // 主动探测 / 手动指认：都不涉及取出/放入，不显示预览
+        // （手动指认时槽位模式被归一化成 ALL，若继续往下走会显示一行假的"即将取出"）
+        if (state.behavior() == Behavior.PROBE || state.behavior() == Behavior.MAPPING) {
             return;
         }
 
         // 放入模式：显示主手物品（无需服务端数据）
-        if (state.action() == ExtractionAction.DEPOSIT) {
+        if (state.behavior() == Behavior.DEPOSIT) {
             ItemStack held = player.getMainHandItem();
             if (held.isEmpty()) {
                 return;
             }
-            if (!OutputSlotExtractor.canDepositTo(blockEntity, state.mode(), held)) {
+            // 槽位过滤/容量逐槽校验：全部放不下时不显示预览
+            if (!OutputSlotExtractor.canDepositTo(player, blockEntity, state.slots(), held)) {
                 return;
             }
             addBox(tooltip, Component.translatable("betterremoval.jade.deposit").withStyle(ChatFormatting.GREEN), List.of(held));
@@ -82,7 +84,7 @@ public class ExtractionPreviewProvider implements IBlockComponentProvider {
         }
 
         // 补货模式：空手，显示可补充的已有物品（服务端下发，回退客户端本地计算）
-        if (state.action() == ExtractionAction.RESTOCK) {
+        if (state.behavior() == Behavior.RESTOCK) {
             if (!player.getMainHandItem().isEmpty() || !player.getOffhandItem().isEmpty()) {
                 return;
             }
@@ -131,7 +133,7 @@ public class ExtractionPreviewProvider implements IBlockComponentProvider {
     /**
      * 优先读取服务端下发的真实物品；缺失时按行为回退到客户端本地读取。
      */
-    private List<ItemStack> readItems(BlockAccessor accessor, BlockEntity blockEntity, ModeState state) {
+    private List<ItemStack> readItems(BlockAccessor accessor, BlockEntity blockEntity, InteractionMode state) {
         CompoundTag serverData = accessor.getServerData();
         if (serverData != null && serverData.contains(BetterRemovalServerData.DATA_KEY)) {
             ListTag list = serverData.getList(BetterRemovalServerData.DATA_KEY, Tag.TAG_COMPOUND);
@@ -144,9 +146,10 @@ public class ExtractionPreviewProvider implements IBlockComponentProvider {
             }
             return items;
         }
-        if (state.action() == ExtractionAction.RESTOCK) {
+        if (state.behavior() == Behavior.RESTOCK) {
             return OutputSlotExtractor.collectRestockPreview(blockEntity, accessor.getPlayer());
         }
-        return ExtractionPreviewItems.collect(blockEntity, state.mode());
+        // 取出预览：客户端本地回退时同样带上玩家——手动指认的容器要按他构造临时菜单
+        return ExtractionPreviewItems.collect(accessor.getPlayer(), blockEntity, state.slots());
     }
 }

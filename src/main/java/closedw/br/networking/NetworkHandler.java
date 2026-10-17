@@ -1,8 +1,9 @@
 package closedw.br.networking;
 
-import closedw.br.CarryOnCompat;
-import closedw.br.ExtractionModeManager;
-import closedw.br.ModeState;
+import closedw.br.behavior.InteractionMode;
+import closedw.br.behavior.InteractionModeManager;
+import closedw.br.mapping.MappingSessionManager;
+import closedw.br.mapping.MappingSessionState;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
@@ -21,23 +22,38 @@ public final class NetworkHandler {
         registrar.playToServer(ExtractionModeSetPayload.TYPE, ExtractionModeSetPayload.CODEC, (payload, context) -> {
             context.enqueueWork(() -> {
                 if (context.player() instanceof ServerPlayer player) {
-                    ModeState state = ExtractionModeManager.setState(player, new ModeState(payload.action(), payload.mode()));
-                    player.displayClientMessage(ExtractionModeManager.getStateMessage(state), false);
+                    InteractionMode state = InteractionModeManager.setState(player,
+                            new InteractionMode(payload.behavior(), payload.slots()));
+                    player.displayClientMessage(InteractionModeManager.getStateMessage(state), false);
                 }
             });
         });
 
-        registrar.playToServer(AltKeyStatePayload.TYPE, AltKeyStatePayload.CODEC, (payload, context) -> {
+        registrar.playToServer(ExtractKeyStatePayload.TYPE, ExtractKeyStatePayload.CODEC, (payload, context) -> {
             context.enqueueWork(() -> {
                 if (context.player() instanceof ServerPlayer player) {
-                    CarryOnCompat.setAltKeyDown(player.getUUID(), payload.pressed());
+                    ExtractKeyStateManager.setAltKeyDown(player, payload.pressed());
+                }
+            });
+        });
+
+        // 手动指认：客户端把"悬停槽位 + 角色"发过来，服务端用自己的菜单校验
+        registrar.playToServer(MappingUpdatePayload.TYPE, MappingUpdatePayload.CODEC, (payload, context) -> {
+            context.enqueueWork(() -> {
+                if (context.player() instanceof ServerPlayer player) {
+                    MappingSessionManager.setRole(player, payload.menuIndex(), payload.role());
                 }
             });
         });
 
         registrar.playToClient(ExtractionModeSyncPayload.TYPE, ExtractionModeSyncPayload.CODEC, (payload, context) -> {
-            context.enqueueWork(() -> ExtractionModeManager.setClientState(
-                    new ModeState(payload.action(), payload.mode()), payload.probeAvailable()));
+            context.enqueueWork(() -> InteractionModeManager.setClientState(
+                    new InteractionMode(payload.behavior(), payload.slots()),
+                    payload.probeAvailable(), payload.mappingAvailable()));
+        });
+
+        registrar.playToClient(MappingFeedbackPayload.TYPE, MappingFeedbackPayload.CODEC, (payload, context) -> {
+            context.enqueueWork(() -> MappingSessionState.update(payload));
         });
     }
 }

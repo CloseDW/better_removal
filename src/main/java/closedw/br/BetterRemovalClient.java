@@ -1,7 +1,8 @@
 package closedw.br;
 
+import closedw.br.client.MappingSession;
 import closedw.br.client.ModeWheel;
-import closedw.br.networking.AltKeyStatePayload;
+import closedw.br.networking.ExtractKeyStatePayload;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -9,10 +10,13 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.client.event.ContainerScreenEvent;
 import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
+import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.lwjgl.glfw.GLFW;
@@ -39,6 +43,12 @@ public class BetterRemovalClient {
         NeoForge.EVENT_BUS.addListener(BetterRemovalClient::onClientTick);
         NeoForge.EVENT_BUS.addListener(BetterRemovalClient::onMouseScroll);
         NeoForge.EVENT_BUS.addListener(BetterRemovalClient::onRenderGui);
+        NeoForge.EVENT_BUS.addListener(BetterRemovalClient::onLoggingIn);
+        NeoForge.EVENT_BUS.addListener(BetterRemovalClient::onLoggingOut);
+        // 手动指认：在容器界面里滚轮选画笔、按住修饰键滑过槽位涂抹、画叠层标签
+        NeoForge.EVENT_BUS.addListener(BetterRemovalClient::onScreenMouseScrolled);
+        NeoForge.EVENT_BUS.addListener(BetterRemovalClient::onScreenClosing);
+        NeoForge.EVENT_BUS.addListener(BetterRemovalClient::onContainerScreenForeground);
     }
 
     public static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
@@ -72,9 +82,25 @@ public class BetterRemovalClient {
             boolean pressed = extractKey.isDown();
             if (pressed != extractLastPressed) {
                 extractLastPressed = pressed;
-                PacketDistributor.sendToServer(new AltKeyStatePayload(pressed));
+                PacketDistributor.sendToServer(new ExtractKeyStatePayload(pressed));
             }
         }
+    }
+
+    /**
+     * 服务端在玩家加入时把修饰键状态重置为"未按下"。客户端只在按键状态变化时才发包，
+     * 所以重连后必须重新同步一次，否则修饰键要抬起来再按才生效。
+     */
+    public static void onLoggingIn(ClientPlayerNetworkEvent.LoggingIn event) {
+        extractLastPressed = false;
+        if (extractKey != null && extractKey.isDown()) {
+            extractLastPressed = true;
+            PacketDistributor.sendToServer(new ExtractKeyStatePayload(true));
+        }
+    }
+
+    public static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
+        extractLastPressed = false;
     }
 
     public static void onMouseScroll(InputEvent.MouseScrollingEvent event) {
@@ -88,9 +114,54 @@ public class BetterRemovalClient {
     }
 
     /**
+     * 容器界面内的滚轮：指认会话开启时用来换画笔。
+     */
+    public static void onScreenMouseScrolled(ScreenEvent.MouseScrolled.Pre event) {
+        if (MappingSession.onMouseScrolled(event)) {
+            event.setCanceled(true);
+        }
+    }
+
+    /** 任意界面关闭：把指认会话换掉的系统光标还回去。 */
+    public static void onScreenClosing(ScreenEvent.Closing event) {
+        MappingSession.onScreenClosing();
+    }
+
+    /** 容器界面前景：画指认标签。 */
+    public static void onContainerScreenForeground(ContainerScreenEvent.Render.Foreground event) {
+        MappingSession.renderForeground(event);
+    }
+
+    /**
      * 修饰键是否处于按下状态（供 Jade 预览判断左Alt）。
+     * 注意：这个值来自 {@link KeyMapping}，而原版在<b>有界面打开时不会</b>把新按下的键写进 KeyMapping
+     * （KeyboardHandler 只在 {@code screen == null} 时 {@code KeyMapping.set(..., true)}），
+     * 所以在 GUI 里判断修饰键必须用 {@link #isExtractKeyPhysicallyDown()}。
      */
     public static boolean isExtractKeyPressed() {
         return extractKey != null && extractKey.isDown();
+    }
+
+    /**
+     * 修饰键此刻是否真的被按着：直接问 GLFW，绕开 KeyMapping 在界面打开时不更新的问题。
+     * 键盘与鼠标键位都支持（默认是左 Alt）。
+     */
+    public static boolean isExtractKeyPhysicallyDown() {
+        if (extractKey == null) {
+            return false;
+        }
+        InputConstants.Key key = extractKey.getKey();
+        if (key.getValue() < 0) {
+            return false;
+        }
+        Minecraft mc = Minecraft.getInstance();
+        if (mc == null || mc.getWindow() == null) {
+            return false;
+        }
+        long window = mc.getWindow().getWindow();
+        if (key.getType() == InputConstants.Type.MOUSE) {
+            return GLFW.glfwGetMouseButton(window, key.getValue()) == GLFW.GLFW_PRESS;
+        }
+        return InputConstants.isKeyDown(window, key.getValue());
     }
 }

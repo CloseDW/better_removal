@@ -1,0 +1,41 @@
+{
+  "_comment": "Fossils and Archeology: Revival. The Analyzer has a lot of slots, so it declares size to get the startup self-check.",
+  "containers": [
+    {
+      "_note": "Analyzer: 0-8 inputs, 9-12 outputs",
+      "match": "fossil:analyzer, @com.github.teamfossilsarcheology.fossil.block.entity.AnalyzerBlockEntity",
+      "config": "analyzer",
+      "default": true,
+      "size": 13,
+      "extract": { "input": [0, 1, 2, 3, 4, 5, 6, 7, 8], "output": [9, 10, 11, 12] },
+      "deposit": { "input": [0, 1, 2, 3, 4, 5, 6, 7, 8] }
+    },
+    {
+      "_note": "Sifter: 0 input, 1-5 outputs",
+      "match": "fossil:sifter, @com.github.teamfossilsarcheology.fossil.block.entity.SifterBlockEntity",
+      "config": "sifter",
+      "default": true,
+      "size": 6,
+      "extract": { "input": [0], "output": [1, 2, 3, 4, 5] },
+      "deposit": { "input": [0] }
+    },
+    {
+      "_note": "Culture Vat: 0 input, 1 fuel, 2 output",
+      "match": "fossil:culture_vat, @com.github.teamfossilsarcheology.fossil.block.entity.CultureVatBlockEntity",
+      "config": "culture_vat",
+      "default": true,
+      "size": 3,
+      "extract": { "input": [0], "fuel": [1], "output": [2] },
+      "deposit": { "input": [0], "fuel": [1] }
+    },
+    {
+      "_note": "Worktable: 0 input, 1 fuel, 2 output",
+      "match": "fossil:worktable, @com.github.teamfossilsarcheology.fossil.block.entity.WorktableBlockEntity",
+      "config": "worktable",
+      "default": true,
+      "size": 3,
+      "extract": { "input": [0], "fuel": [1], "output": [2] },
+      "deposit": { "input": [0], "fuel": [1] }
+    }
+  ]
+}

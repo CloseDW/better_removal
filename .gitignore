@@ -28,9 +28,18 @@ bin/
 
 ### VS Code ###
 .vscode/
+*.code-workspace
 
 ### Mac OS ###
 .DS_Store
+.AppleDouble
+.LSOverride
+
+### Windows ###
+Thumbs.db
+Thumbs.db:encryptable
+desktop.ini
+ehthumbs.db
 
 ### Minecraft Modding ###
 run/
@@ -38,3 +47,32 @@ run/
 **/src/generated/**/.cache/
 repo/
 !**/src/**/repo/
+
+### 第三方 / 本地依赖 jar：不要随仓库分发 ###
+libs/*.jar
+libs/**/*.jar
+# 自己的旧构建产物同理：走 GitHub Releases，不进 git
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+### 开发期产物 / 日志 / 崩溃报告 ###
+*.log
+logs/
+crash-reports/
+hs_err_pid*.log
+replay_pid*.log
+
+### 备份与编辑器临时文件 ###
+*.bak
+*.orig
+*.tmp
+*.swp
+*.swo
+*~
+
+### 本机工作流目录（不属于项目本身）###
+.qoder/
+.reasonix/
+.cursor/
+.aider*
+.claude/
