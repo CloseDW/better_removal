@@ -54,6 +54,8 @@ libs/**/*.jar
 # 自己的旧构建产物同理：走 GitHub Releases，不进 git
 *.jar
 !gradle/wrapper/gradle-wrapper.jar
+# Configured 是 LGPL-3.0（允许再分发）：随仓库提交，CI 才能直接编译
+!libs/configured-*.jar
 
 ### 开发期产物 / 日志 / 崩溃报告 ###
 *.log

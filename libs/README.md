@@ -1,17 +1,19 @@
-# libs/ —— 本地编译依赖（不进 git）
+# libs/ —— 编译期依赖
 
-本工程的 `build.gradle` 用 **compileOnly** 引用这两个文件，**没有就不会编译通过**：
+本工程的 `build.gradle` 用 **compileOnly** 引用第三方模组的 API。两个依赖的处理方式不同：
 
-| 需要的文件 | 来源 | 协议 |
-|---|---|---|
-| `configured-neoforge-1.21.1-2.6.3.jar` | Configured（MrCrayfish）— Modrinth / CurseForge | LGPL-3.0 |
-| `jade-neoforge-1.21.1.jar` | Jade（Snownee）— Modrinth / CurseForge | CC-BY-NC-SA-4.0 |
+| 文件 | 来源 | 协议 | 是否随仓库提交 |
+|---|---|---|---|
+| `configured-neoforge-1.21.1-2.6.3.jar` | Configured（MrCrayfish）— Modrinth / CurseForge / [GitHub Releases](https://github.com/MrCrayfish/Configured/releases/tag/v1.21.1-2.6.3) | **LGPL-3.0**（允许再分发） | **是**① |
+| Jade | Jade（Snownee）— 由 Gradle 解析 `maven.modrinth:jade:eYz2YBGT`② | **CC-BY-NC-SA-4.0**（不允许再分发） | **否** |
 
-> 两个 jar 都**不要提交到仓库**（见根目录 `.gitignore`）。Jade 的协议明确不允许再分发，
-> Configured 的 LGPL 也有附加条件。这里只用它们做编译期 API：**Configured 是必需依赖**（`neoforge.mods.toml` 里声明 required，运行时必须装，否则游戏会报缺少依赖）；**Jade 可选**（不装就没有工具提示预览）。
->
-> 文件名/版本要与 `build.gradle` 里的 `compileOnly files("libs/...")` 完全一致；
-> 换版本时两处一起改。
+① 提交它是为了让全新克隆 / GitHub Actions 不需要任何额外步骤就能编译（`.gitignore` 里对
+`libs/configured-*.jar` 开了例外）。
+② 版本 ID `eYz2YBGT` = Jade **15.10.6+neoforge**（版本号里带 `+`，用 ID 更稳）。
 
-**更省事的做法**：把这两行换成 Modrinth Maven 坐标（公共仓库、无需手动放 jar），
-就不再需要这个目录了 —— 需要的话可以让脚本改成 `maven.modrinth:jade:<版本>` 形式。
+换版本时改 `build.gradle` 里对应那一行；Configured 还要把新 jar 放进本目录一起提交。
+
+两个 jar 都**不会被打进本模组**。运行时的要求不同：
+
+- **Configured**：必需依赖（`neoforge.mods.toml` 里声明 `required`）——没装游戏会直接报缺少依赖；
+- **Jade**：可选——不装就只是没有工具提示预览。

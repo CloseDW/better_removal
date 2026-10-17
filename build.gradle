@@ -27,7 +27,14 @@ sourceSets.main.resources {
 }
 
 repositories {
-    // Add here additional repositories if required by some of the dependencies below.
+    // Jade 的编译期 API（Jade 是 CC-BY-NC-SA-4.0，不能随仓库分发，所以从 Modrinth Maven 取）
+    maven {
+        name = "Modrinth"
+        url = "https://api.modrinth.com/maven"
+        content {
+            includeGroup "maven.modrinth"
+        }
+    }
 }
 
 base {
@@ -116,11 +123,15 @@ configurations {
 }
 
 dependencies {
-    // Configured (MrCrayfish) - 编译期使用其配置 API，运行时由用户自行安装
+    // 两个第三方模组都只用来取编译期 API，运行时由玩家自行安装，都不会被打进本模组。
+    //
+    // Configured（LGPL-3.0）随仓库分发：它的 jar 放在 libs/ 里一并提交，
+    // 这样全新克隆 / CI 不需要任何额外步骤就能编译。
     compileOnly files("libs/configured-neoforge-1.21.1-2.6.3.jar")
 
-    // Jade - 编译期使用其 API 实现工具提示联动，运行时由用户自行安装
-    compileOnly files("libs/jade-neoforge-1.21.1.jar")
+    // Jade（CC-BY-NC-SA-4.0）**不允许**再分发，所以不放进仓库，走 Modrinth Maven。
+    // 版本 ID eYz2YBGT = Jade 15.10.6+neoforge（版本号里带 "+"，用 ID 更稳）。
+    compileOnly "maven.modrinth:jade:eYz2YBGT"
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.
