@@ -1,0 +1,23 @@
+{
+  "_comment": "Crabber's Delight and Farmer's Delight. The basket has no input/fuel distinction, so every slot can be extracted from and deposited into.",
+  "containers": [
+    {
+      "_note": "Crab Trap: 0 bait, 1-9 catch",
+      "match": "crabbersdelight:crab_trap, @alabaster.crabbersdelight.common.block.entity.CrabTrapBlockEntity",
+      "config": "crab_trap",
+      "default": true,
+      "size": 10,
+      "extract": { "input": [0], "output": [1, 2, 3, 4, 5, 6, 7, 8, 9] },
+      "deposit": { "input": [0] }
+    },
+    {
+      "_note": "Wooden/bamboo basket: every slot can be extracted from and deposited into. Its match has no namespace to infer, so the group is declared explicitly.",
+      "match": "@vectorwing.farmersdelight.common.block.entity.BasketBlockEntity",
+      "config": "basket",
+      "group": "farmersdelight",
+      "default": true,
+      "extract": { "input": "*", "fuel": "*", "output": "*" },
+      "deposit": { "input": "*", "fuel": "*" }
+    }
+  ]
+}

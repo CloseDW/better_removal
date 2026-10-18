@@ -66,6 +66,16 @@ description='''${mod_description}'''
     ordering="NONE"
     side="BOTH"
 
+# Configured (MrCrayfish) 是**必需**依赖：容器开关、声明式槽位规则与只读的"已指认的容器"视图
+# 都通过它的界面暴露；而开关决定的是服务端行为，两侧都要读同一份配置，所以服务端也得装。
+# NeoForge 侧同样声明为 required（neoforge.mods.toml 的 type="required"），版本号按 1.20.1 的 Configured 2.2.x 写。
+[[dependencies.${mod_id}]]
+    modId="configured"
+    mandatory=true
+    versionRange="[2.2.0,)"
+    ordering="NONE"
+    side="BOTH"
+
 # Features are specific properties of the game environment, that you may want to declare you require. This example declares
 # that your mod requires GL version 3.2 or higher. Other features will be added. They are side aware so declaring this won't
 # stop your mod loading on the server for example.
@@ -74,4 +84,4 @@ description='''${mod_description}'''
 
 # Configured (MrCrayfish) - 配置界面 provider，Configured 通过 modproperties 发现
 [modproperties.${mod_id}]
-    configuredProviders="com.better_removal.config.BetterRemovalConfigProvider"
+    configuredProviders="closedw.br.config.BetterRemovalConfigProvider"

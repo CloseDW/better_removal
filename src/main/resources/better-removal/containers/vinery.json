@@ -1,0 +1,23 @@
+{
+  "_comment": "Vinery. On the Apple Press the extract fuel slot and the deposit fuel slot are not the same slot, so the two directions are declared separately.",
+  "containers": [
+    {
+      "_note": "Fermentation Barrel: 0 grape juice, 1-3 ingredients, 4 wine bottle, 5 output",
+      "match": "vinery:fermentation_barrel, @net.satisfy.vinery.core.block.entity.FermentationBarrelBlockEntity",
+      "config": "fermentation_barrel",
+      "default": true,
+      "size": 6,
+      "extract": { "input": [0, 1, 2, 3], "fuel": [4], "output": [5] },
+      "deposit": { "input": [0, 1, 2, 3], "fuel": [4] }
+    },
+    {
+      "_note": "Apple Press: 0 press input, 1 intermediate product, 2 wine bottle input, 3 output. The extract fuel preset takes output slot 3, the deposit fuel preset feeds wine bottle slot 2 (keeping the original semantics)",
+      "match": "vinery:apple_press, @net.satisfy.vinery.core.block.entity.ApplePressBlockEntity",
+      "config": "apple_press",
+      "default": true,
+      "size": 4,
+      "extract": { "input": [0, 1, 2], "fuel": [3], "output": [3] },
+      "deposit": { "input": [0, 1, 2], "fuel": [2] }
+    }
+  ]
+}

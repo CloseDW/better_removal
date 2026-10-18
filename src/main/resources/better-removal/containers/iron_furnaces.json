@@ -1,11 +1,15 @@
 {
+  "_comment": "Iron Furnaces. These furnaces implement nothing beyond the vanilla Container, so their layout matches the furnace; slot 3 onwards are upgrade slots and are ignored.",
   "containers": [
     {
       "match": "ironfurnaces:copper_furnace,ironfurnaces:iron_furnace,ironfurnaces:silver_furnace,ironfurnaces:gold_furnace,ironfurnaces:diamond_furnace,ironfurnaces:emerald_furnace,ironfurnaces:obsidian_furnace,ironfurnaces:crystal_furnace,ironfurnaces:netherite_furnace,ironfurnaces:allthemodium_furnace,ironfurnaces:vibranium_furnace,ironfurnaces:unobtainium_furnace,ironfurnaces:million_furnace",
-      "input": [0],
-      "fuel": [1],
-      "output": [2],
-      "ignore": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+      "config": "iron_furnaces",
+      "group": "ironfurnaces",
+      "default": true,
+      "size": 19,
+      "sided": false,
+      "extract": { "input": [0], "fuel": [1], "output": [2], "ignore": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18] },
+      "deposit": { "input": [0], "fuel": [1] }
     }
   ]
 }
