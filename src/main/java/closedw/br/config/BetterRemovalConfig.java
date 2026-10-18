@@ -57,7 +57,7 @@ public class BetterRemovalConfig implements IModConfig
     public static final Map<String, Integer> INT_DEFAULTS = new LinkedHashMap<>();
 
     /**
-     * 字符串列表配置键与默认值（实验性自动探测白名单等）。
+     * 字符串列表配置键与默认值（声明式槽位规则等）。
      */
     public static final Map<String, List<String>> LIST_DEFAULTS = new LinkedHashMap<>();
 
@@ -66,7 +66,14 @@ public class BetterRemovalConfig implements IModConfig
      * 只有列在这里的键才会把 tooltip 交给 Configured，避免缺文案时界面显示原始翻译键。
      */
     public static final Set<String> TOOLTIP_KEYS = new LinkedHashSet<>(List.of(
-            "experimental_auto_detect", "experimental_transfer_probe"));
+            "experimental_transfer_probe", "menu_mapping"));
+
+    /**
+     * 没有 json 规则、必须硬编码的容器开关：配置键 → 分组名。
+     * 厨锅/烤炉的方块实体没有实现原版 {@code Inventory}，槽位布局写不进规则，只能留在代码里，
+     * 所以它们的开关也要在这里手工登记，否则 Configured 里看不到、也关不掉。
+     */
+    private static final Map<String, String> BUILTIN_CONTAINER_GROUPS = new LinkedHashMap<>();
 
     /**
      * 声明式规则里的「模组命名空间 → 容器开关分组」映射。
@@ -97,11 +104,14 @@ public class BetterRemovalConfig implements IModConfig
         NAMESPACE_TO_GROUP.put("farm_and_charm", "farm_and_charm");
         NAMESPACE_TO_GROUP.put("ironfurnaces", "ironfurnaces");
 
+        // 硬编码容器：厨锅（农夫乐事）/ 烤炉（懒人厨房）各一个开关
+        BUILTIN_CONTAINER_GROUPS.put("cooking_pot", "farmersdelight");
+        BUILTIN_CONTAINER_GROUPS.put("oven", "cookingforblockheads");
+
         // 三个顶层大类：容器开关 / 实验性 / 通用
         // 「容器开关」下的分组与每个分组的键由注册的规则推导，见 registerRuleContainers
         CATEGORIES.put("experimental", List.of(
-                "experimental_auto_detect", "auto_detect_whitelist",
-                "experimental_transfer_probe", "slot_rules"));
+                "experimental_transfer_probe", "menu_mapping", "slot_rules"));
 
         CATEGORIES.put("general", List.of(
                 "jade_preview", "ftb_ultimine", "deposit", "restock", "ftb_ultimine_max_containers"));
@@ -112,18 +122,16 @@ public class BetterRemovalConfig implements IModConfig
         DEFAULT_VALUES.put("deposit", true);
         DEFAULT_VALUES.put("restock", true);
 
-        // 实验性：通用容器槽位自动探测，默认关闭；开启后必须配置白名单才生效
-        DEFAULT_VALUES.put("experimental_auto_detect", false);
-
-        // 实验性：主动探测模式（按住修饰键右击容器，把槽位探测结果以规则 JSON 打到聊天框），默认关闭
+        // 实验性：主动探测模式（按住修饰键右击容器，把槽位探测结果以规则串打到聊天框），默认关闭
         DEFAULT_VALUES.put("experimental_transfer_probe", false);
+
+        // 实验性：手动指认（修饰键右击容器开界面，按住修饰键滑过槽位即可标记，关界面保存），默认关闭
+        DEFAULT_VALUES.put("menu_mapping", false);
 
         // FTB Ultimine连锁取出单次最多容器数量（64）
         INT_DEFAULTS.put("ftb_ultimine_max_containers", 64);
 
-        LIST_DEFAULTS.put("auto_detect_whitelist", List.of());
-
-        // 声明式槽位规则，每条一条 "匹配串 角色=槽位..."；不受实验性总开关约束
+        // 声明式槽位规则，每条一条 "匹配串 角色=槽位..."
         LIST_DEFAULTS.put("slot_rules", List.of());
     }
 
@@ -131,6 +139,14 @@ public class BetterRemovalConfig implements IModConfig
     private final Map<String, IntegerValue> intValues = new LinkedHashMap<>();
     private final Map<String, StringListValue> listValues = new LinkedHashMap<>();
     private IConfigEntry root;
+
+    /**
+     * 最近一次从盘上读到的属性快照。
+     * <p>
+     * 规则容器的开关键不在 {@link #load()} 的遍历范围里（那是规则加载之后才登记的），
+     * 所以登记时必须回到这份快照里取玩家上次保存的值——否则每次重启都会把用户的选择重置成默认值。
+     */
+    private Properties loadedProps = new Properties();
 
     private BetterRemovalConfig()
     {
@@ -164,6 +180,8 @@ public class BetterRemovalConfig implements IModConfig
                 LOGGER.warn("Failed to load config from {}", path, e);
             }
         }
+        // 快照留着给 registerRuleContainers 用（规则容器的键那时才登记）
+        this.loadedProps = props;
         DEFAULT_VALUES.forEach((key, defaultValue) ->
         {
             boolean value = Boolean.parseBoolean(props.getProperty(key, String.valueOf(defaultValue)));
@@ -245,6 +263,8 @@ public class BetterRemovalConfig implements IModConfig
             try(OutputStream out = Files.newOutputStream(path))
             {
                 props.store(out, "Better Removal container toggles (edited via Configured)");
+                // 保存成功即把内存快照换成刚写入的属性，后续重新登记的路径才会读到新值
+                this.loadedProps = props;
             }
         }
         catch(IOException e)
@@ -266,31 +286,9 @@ public class BetterRemovalConfig implements IModConfig
     public void registerRuleContainers(Map<String, Boolean> configKeys, Map<String, String> declaredGroups)
     {
         Map<String, List<String>> groups = new LinkedHashMap<>();
-        configKeys.forEach((key, defaultValue) ->
-        {
-            if(key == null || key.isBlank())
-            {
-                return;
-            }
-            String declared = declaredGroups.get(key);
-            String group = declared == null || declared.isBlank()
-                    ? "rules"
-                    : NAMESPACE_TO_GROUP.getOrDefault(declared, declared);
-
-            // 值定义始终登记（老配置里的键要能保留、机器翻译不了也不能丢），只是界面不显示
-            DEFAULT_VALUES.putIfAbsent(key, defaultValue);
-            // 已经有值的键（老配置 / 上一次 reload）保持原值，只补上缺失的定义
-            if(!this.values.containsKey(key))
-            {
-                this.values.put(key, new BooleanValue(key, defaultValue, defaultValue, TOOLTIP_KEYS.contains(key)));
-            }
-
-            if(!isGroupVisible(group))
-            {
-                return;
-            }
-            groups.computeIfAbsent(group, name -> new ArrayList<>()).add(key);
-        });
+        // 硬编码容器（厨锅/烤炉）没有 json 规则，开关在这里补齐
+        BUILTIN_CONTAINER_GROUPS.forEach((key, group) -> addContainerKey(key, true, group, groups));
+        configKeys.forEach((key, defaultValue) -> addContainerKey(key, defaultValue, declaredGroups.get(key), groups));
 
         if(groups.isEmpty())
         {
@@ -310,6 +308,43 @@ public class BetterRemovalConfig implements IModConfig
         });
         // 分组变了，Configured 的界面缓存必须作废
         this.root = null;
+    }
+
+    /**
+     * 登记一个容器开关：补齐值定义、恢复盘上保存的值、按可见性归组。
+     * @param declaredGroup 规则声明的分组名（可为 null，落到兜底分组 {@code rules}）
+     */
+    private void addContainerKey(String key, boolean defaultValue, String declaredGroup, Map<String, List<String>> groups)
+    {
+        if(key == null || key.isBlank())
+        {
+            return;
+        }
+        String group = declaredGroup == null || declaredGroup.isBlank()
+                ? "rules"
+                : NAMESPACE_TO_GROUP.getOrDefault(declaredGroup, declaredGroup);
+
+        // 值定义始终登记（老配置里的键要能保留、机器翻译不了也不能丢），只是界面不显示
+        DEFAULT_VALUES.putIfAbsent(key, defaultValue);
+        // 已经有值的键（老配置 / 上一次 reload）保持原值，只补上缺失的定义
+        if(!this.values.containsKey(key))
+        {
+            // 这个键不在 load() 的遍历范围里，所以初始值要回到盘上快照取，
+            // 否则玩家在 Configured 里关掉的容器每次重启都会自己打开
+            boolean saved = Boolean.parseBoolean(
+                    this.loadedProps.getProperty(key, String.valueOf(defaultValue)));
+            this.values.put(key, new BooleanValue(key, defaultValue, saved, TOOLTIP_KEYS.contains(key)));
+        }
+
+        if(!isGroupVisible(group))
+        {
+            return;
+        }
+        List<String> keys = groups.computeIfAbsent(group, name -> new ArrayList<>());
+        if(!keys.contains(key))
+        {
+            keys.add(key);
+        }
     }
 
     /**

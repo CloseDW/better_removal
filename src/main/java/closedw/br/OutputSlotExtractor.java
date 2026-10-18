@@ -4,13 +4,15 @@ import closedw.br.behavior.Behavior;
 import closedw.br.behavior.InteractionMode;
 import closedw.br.behavior.InteractionModeManager;
 import closedw.br.config.BetterRemovalConfig;
-import closedw.br.container.detect.AutoDetectSupport;
+import closedw.br.container.access.MenuSlotAccess;
+import closedw.br.container.detect.SlotDetection;
 import closedw.br.container.detect.SlotProbeReport;
 import closedw.br.container.Stacks;
 import closedw.br.container.support.ContainerAccess;
 import closedw.br.container.support.ContainerRegistry;
 import closedw.br.container.support.ContainerSupport;
 import closedw.br.ftbultimine.FTBUltimineSupport;
+import closedw.br.mapping.MappingSessionManager;
 import closedw.br.networking.ExtractKeyStateManager;
 import closedw.br.slot.SlotSet;
 
@@ -76,13 +78,15 @@ public final class OutputSlotExtractor {
 	}
 
 	/**
-	 * 实验性功能总开关（Configured 中的 experimental_auto_detect，默认关闭）。
-	 * 手写槽位规则与自动探测都受它约束。
-	 * 未安装 Configured 时读不到这个开关，按“关闭”处理（与其它容器开关的默认启用语义不同）。
+	 * 查询一个"默认关闭"的实验性开关（{@code menu_mapping} / {@code experimental_transfer_probe}）。
+	 * <p>
+	 * 与 {@link #isContainerEnabled} 刻意相反：读不到配置时返回 <b>false</b>。
+	 * 容器开关缺失配置时按"开启"处理（宁可照旧也不要静默失效），但实验性功能必须相反——
+	 * 缺配置就当没开，否则它会绕过"默认关闭"的约定自己冒出来。
 	 */
-	public static boolean isExperimentalEnabled() {
+	public static boolean isExperimentalSwitchOn(String key) {
 		try {
-			return BetterRemovalConfig.get().isEnabled("experimental_auto_detect");
+			return BetterRemovalConfig.get().isEnabled(key);
 		}
 		catch (LinkageError e) {
 			return false;
@@ -90,7 +94,7 @@ public final class OutputSlotExtractor {
 	}
 
 	/**
-	 * 查询字符串列表配置（实验性自动探测白名单）。未安装Configured时返回空列表。
+	 * 查询字符串列表配置（声明式槽位规则 slot_rules）。未安装Configured时返回空列表。
 	 */
 	public static List<String> getConfigList(String key) {
 		try {
@@ -157,12 +161,12 @@ public final class OutputSlotExtractor {
 				continue;
 			}
 			int[] slots = support.extractSlots(blockEntity, mode);
-			ContainerAccess access = support.access(blockEntity);
+			ContainerAccess access = support.access(blockEntity, player);
 			if (slots == null || access == null) {
 				continue;
 			}
 			// 规则可以要求额外校验「该槽位能否被取出」
-			boolean sided = AutoDetectSupport.ruleRequiresSidedCheck(blockEntity);
+			boolean sided = SlotDetection.ruleRequiresSidedCheck(blockEntity);
 			if (takeSlots(player, access, slots, blockEntity instanceof Inventory inventory ? inventory : null, sided)) {
 				access.markDirty();
 				any = true;
@@ -193,11 +197,14 @@ public final class OutputSlotExtractor {
 					if (be == null) {
 						continue;
 					}
-					List<ItemStack> part = ExtractionPreviewItems.collect(be, mode);
-					if (part != null && !part.isEmpty()) {
-						items.addAll(part);
+					List<ItemStack> part = ExtractionPreviewItems.collect(player, be, mode);
+					if (part != null) {
+						// 跨容器也叠起来：两台机器各 32 个同类物品，预览里是一叠 64 而不是两个 32
+						for (ItemStack stack : part) {
+							ExtractionPreviewItems.mergeInto(items, stack);
+						}
 					}
-					// 限制聚合大小，避免向客户端下发过大NBT
+					// 限制聚合大小，避免向客户端下发过大数据
 					if (items.size() >= 128) {
 						break;
 					}
@@ -205,10 +212,20 @@ public final class OutputSlotExtractor {
 				return items;
 			}
 		}
-		return ExtractionPreviewItems.collect(blockEntity, mode);
+		return ExtractionPreviewItems.collect(player, blockEntity, mode);
 	}
 
 	private static ActionResult onUseBlock(PlayerEntity player, World world, Hand hand, BlockHitResult hitResult) {
+		try {
+			return handleUseBlock(player, world, hand, hitResult);
+		}
+		finally {
+			// 菜单槽位（手动指认映射）会临时构造菜单：操作结束统一关闭，别漏掉 onClosed 钩子
+			MenuSlotAccess.closeAll(player);
+		}
+	}
+
+	private static ActionResult handleUseBlock(PlayerEntity player, World world, Hand hand, BlockHitResult hitResult) {
 		// 修饰键：左Alt（可改键）
 		if (!isModifierHeld(player)) {
 			return ActionResult.PASS;
@@ -223,6 +240,20 @@ public final class OutputSlotExtractor {
 		}
 
 		InteractionMode state = InteractionModeManager.getState(player);
+
+		// ---------- 手动指认：不取消交互，让原版照常打开 GUI，玩家在界面里标槽位 ----------
+		if (state.behavior() == Behavior.MAPPING) {
+			if (!InteractionModeManager.isMappingAvailable()) {
+				// 开关关掉后玩家可能还停在"手动指认"模式
+				return ActionResult.PASS;
+			}
+			if (player instanceof ServerPlayerEntity serverPlayer) {
+				// 记下目标容器（并提前验证它的菜单能不能在没有 GUI 的情况下重建）
+				MappingSessionManager.begin(serverPlayer, hitResult.getBlockPos());
+			}
+			// 返回 PASS：不拦原版交互，界面照常打开
+			return ActionResult.PASS;
+		}
 
 		// ---------- 主动探测（实验性）：槽位探测的结果打印到聊天框，不动容器 ----------
 		if (state.behavior() == Behavior.PROBE) {
@@ -251,7 +282,7 @@ public final class OutputSlotExtractor {
 			}
 			// 补货：从背包向容器输入/燃料槽补充已有同类物品（空槽不补）
 			if (state.behavior() == Behavior.RESTOCK) {
-				return handleRestock(player, world, hitResult.getBlockPos(), blockEntity);
+				return handleRestock(player, world, hitResult.getBlockPos());
 			}
 			// 放入预设下空手右击不动作
 			if (state.behavior() != Behavior.EXTRACT) {
@@ -295,7 +326,7 @@ public final class OutputSlotExtractor {
 			return ActionResult.PASS;
 		}
 		int[] slots = support.depositSlots(blockEntity, state.slots());
-		ContainerAccess access = support.access(blockEntity);
+		ContainerAccess access = support.access(blockEntity, player);
 		if (slots == null || access == null) {
 			return ActionResult.PASS;
 		}
@@ -324,12 +355,12 @@ public final class OutputSlotExtractor {
 			return ActionResult.PASS;
 		}
 		int[] slots = support.extractSlots(blockEntity, mode);
-		ContainerAccess access = support.access(blockEntity);
+		ContainerAccess access = support.access(blockEntity, player);
 		if (slots == null || access == null) {
 			return ActionResult.PASS;
 		}
 		// 规则可以要求额外校验「该槽位能否被取出」
-		boolean sided = AutoDetectSupport.ruleRequiresSidedCheck(blockEntity);
+		boolean sided = SlotDetection.ruleRequiresSidedCheck(blockEntity);
 		if (!takeSlots(player, access, slots, blockEntity instanceof Inventory inventory ? inventory : null, sided)) {
 			return ActionResult.PASS;
 		}
@@ -399,7 +430,7 @@ public final class OutputSlotExtractor {
 				continue;
 			}
 			int[] depositSlots = support.depositSlots(blockEntity, slotMode);
-			ContainerAccess access = support.access(blockEntity);
+			ContainerAccess access = support.access(blockEntity, player);
 			if (depositSlots == null || access == null) {
 				continue;
 			}
@@ -487,14 +518,27 @@ public final class OutputSlotExtractor {
 		}
 		ItemStack refund = template.copy();
 		refund.setCount(count);
-		player.getInventory().offer(refund, false);
+		// 不用 PlayerInventory#offer：它在背包满时会把物品丢到地上
+		insertIntoPlayerInventory(player, refund);
 	}
 
 	/**
 	 * Jade放入预览：判断手持物品是否至少能放进一个目标槽位。
 	 * 会逐槽检查容量与过滤，全部放不下时不显示预览。
+	 * <p>
+	 * 带玩家：手动指认的容器要靠他构造临时菜单。
 	 */
-	public static boolean canDepositTo(BlockEntity blockEntity, SlotSet mode, ItemStack held) {
+	public static boolean canDepositTo(PlayerEntity player, BlockEntity blockEntity, SlotSet mode, ItemStack held) {
+		try {
+			return canDepositToInternal(player, blockEntity, mode, held);
+		}
+		finally {
+			// 预览也会临时构造菜单：读完统一关闭
+			MenuSlotAccess.closeAll(player);
+		}
+	}
+
+	private static boolean canDepositToInternal(PlayerEntity player, BlockEntity blockEntity, SlotSet mode, ItemStack held) {
 		if (blockEntity == null || held == null || held.isEmpty()) {
 			return false;
 		}
@@ -503,7 +547,7 @@ public final class OutputSlotExtractor {
 			return false;
 		}
 		int[] slots = support.depositSlots(blockEntity, mode);
-		ContainerAccess access = support.access(blockEntity);
+		ContainerAccess access = support.access(blockEntity, player);
 		if (slots == null || access == null) {
 			return false;
 		}
@@ -518,91 +562,36 @@ public final class OutputSlotExtractor {
 	// 补货
 	/**
 	 * 补货分支：从背包向容器输入槽和燃料槽补充已有同类物品（空槽不补）。
+	 * <p>
+	 * 单容器与连锁走<b>同一套</b>算法（{@link #restockAcross} 按物品分组后按各槽剩余容量加权分摊）。
+	 * 早期版本单容器是"逐个槽位贪心填"：第一个槽位能吃掉全部存货，后面的槽位就一点都补不到——
+	 * 4 个输入槽各缺 48、背包只有 32 时，结果是 1 号槽吃满 32，其余三个槽空着；
+	 * 同一物品占了两格以上的容器（手动指认的映射、原版漏斗/发射器/投掷器）都会这样。
 	 */
-	private static ActionResult handleRestock(PlayerEntity player, World world, BlockPos pos, BlockEntity blockEntity) {
+	private static ActionResult handleRestock(PlayerEntity player, World world, BlockPos pos) {
 		if (!isContainerEnabled("restock")) {
 			return ActionResult.PASS;
 		}
-		// ---------- FTB Ultimine连锁补货 ----------
-		// 修饰键+空手再按住Ultimine键时，对连锁形状内所有容器逐个补货（背包耗尽即止）
+		// FTB Ultimine连锁补货：修饰键+空手再按住Ultimine键时，对连锁形状内所有容器一起补（背包耗尽即止）
 		List<BlockPos> chain = getChainPositions(player, pos);
 		if (chain != null) {
-			return handleChainRestock(player, world, chain);
+			return restockAcross(player, world, chain);
 		}
-
-		ContainerSupport support = ContainerRegistry.find(blockEntity);
-		if (support == null || !support.enabled() || !support.allowInteraction(blockEntity)) {
-			return ActionResult.PASS;
-		}
-		int[] slots = support.restockSlots(blockEntity);
-		ContainerAccess access = support.access(blockEntity);
-		if (slots == null || access == null) {
-			return ActionResult.PASS;
-		}
-		if (!restockAccess(player, access, slots)) {
-			return ActionResult.PASS;
-		}
-		access.markDirty();
-		player.getInventory().markDirty();
-		playPickupSound(player, world);
-		return ActionResult.SUCCESS;
+		// 单容器补货：走与连锁完全相同的那套"按剩余容量分摊"算法。
+		return restockAcross(player, world, List.of(pos));
 	}
 
 	/**
-	 * 补货：从背包向容器指定槽位补充已有同类物品到槽位上限，空槽不补。
-	 * @return 是否补充了至少一个物品
-	 */
-	private static boolean restockAccess(PlayerEntity player, ContainerAccess access, int[] slots) {
-		boolean movedAny = false;
-		for (int slot : slots) {
-			ItemStack existing = access.get(slot);
-			if (existing.isEmpty()) {
-				// 空槽不补
-				continue;
-			}
-			int need = existing.getMaxCount() - existing.getCount();
-			if (need <= 0) {
-				// 已满
-				continue;
-			}
-			int stock = countInInventory(player, existing);
-			if (stock <= 0) {
-				// 背包没有同类存货
-				continue;
-			}
-			// 单容器补货：需要量与背包存货取小者
-			int want = Math.min(need, stock);
-			// 先模拟放入确认实际可放数量，避免先扣背包后放不进而丢物品
-			ItemStack probe = existing.copy();
-			probe.setCount(want);
-			int canInsert = access.insert(slot, probe, true);
-			if (canInsert <= 0) {
-				continue;
-			}
-			int taken = takeFromPlayerInventory(player, existing, canInsert);
-			if (taken <= 0) {
-				continue;
-			}
-			ItemStack portion = existing.copy();
-			portion.setCount(taken);
-			int put = access.insert(slot, portion, false);
-			if (put < taken) {
-				giveBackToPlayer(player, taken - put, existing);
-			}
-			movedAny = true;
-		}
-		return movedAny;
-	}
-
-	/**
-	 * 连锁补货：把背包存货按物品类型分组，组内按权重（槽位剩余容量）分摊到连锁形状内所有补货槽。
+	 * 补货：把这些容器里可补的槽位按物品类型分组，组内按权重（槽位剩余容量）分摊背包存货。
 	 * 剩余越多的槽位补得越多，尽量补满；空槽不补；背包存货耗尽即止。
+	 * <p>
+	 * 单个容器也走这里（传一个只有它自己的位置表），这样"单容器"和"连锁"的分货行为完全一致。
 	 */
-	private static ActionResult handleChainRestock(PlayerEntity player, World world, List<BlockPos> chain) {
+	private static ActionResult restockAcross(PlayerEntity player, World world, List<BlockPos> positions) {
 		// 第一遍：收集所有可补货的槽位（非空且未满、背包有同类存货）
 		List<RestockSlot> slots = new ArrayList<>();
 		Set<ContainerAccess> dirty = new LinkedHashSet<>();
-		for (BlockPos pos : chain) {
+		for (BlockPos pos : positions) {
 			BlockEntity blockEntity = world.getBlockEntity(pos);
 			if (blockEntity == null) {
 				continue;
@@ -612,7 +601,7 @@ public final class OutputSlotExtractor {
 				continue;
 			}
 			int[] restockSlots = support.restockSlots(blockEntity);
-			ContainerAccess access = support.access(blockEntity);
+			ContainerAccess access = support.access(blockEntity, player);
 			if (restockSlots == null || access == null) {
 				continue;
 			}
@@ -772,6 +761,16 @@ public final class OutputSlotExtractor {
 		if (player == null) {
 			return List.of();
 		}
+		try {
+			return collectRestockPreviewInternal(blockEntity, player);
+		}
+		finally {
+			// 预览会临时构造菜单（手动指认的容器）：读完统一关闭
+			MenuSlotAccess.closeAll(player);
+		}
+	}
+
+	private static List<ItemStack> collectRestockPreviewInternal(BlockEntity blockEntity, PlayerEntity player) {
 		// 收集整个连锁形状（或单个容器）内所有可补货槽位
 		List<RestockCandidate> candidates = new ArrayList<>();
 		List<BlockPos> chain = getChainPositions(player, blockEntity.getPos());
@@ -779,12 +778,12 @@ public final class OutputSlotExtractor {
 			for (BlockPos pos : chain) {
 				BlockEntity be = blockEntity.getWorld().getBlockEntity(pos);
 				if (be != null) {
-					collectRestockCandidates(be, candidates);
+					collectRestockCandidates(player, be, candidates);
 				}
 			}
 		}
 		else {
-			collectRestockCandidates(blockEntity, candidates);
+			collectRestockCandidates(player, blockEntity, candidates);
 		}
 
 		// 按物品类型分组，累加槽位需求量，补货量 = min(总需求量, 背包同类存货)
@@ -811,9 +810,10 @@ public final class OutputSlotExtractor {
 			if (toAdd <= 0) {
 				continue;
 			}
+			// 同种物品叠起来，而且单叠不超过 64（物品自身的堆叠上限更小时按它算）
 			ItemStack display = first.template().copy();
 			display.setCount(toAdd);
-			items.add(display);
+			ExtractionPreviewItems.mergeInto(items, display);
 		}
 		return items;
 	}
@@ -823,13 +823,13 @@ public final class OutputSlotExtractor {
 	}
 
 	/** 收集单个容器的可补货槽位（槽位非空且未满），加入candidates */
-	private static void collectRestockCandidates(BlockEntity blockEntity, List<RestockCandidate> candidates) {
+	private static void collectRestockCandidates(PlayerEntity player, BlockEntity blockEntity, List<RestockCandidate> candidates) {
 		ContainerSupport support = ContainerRegistry.find(blockEntity);
 		if (support == null || !support.enabled() || !support.allowInteraction(blockEntity)) {
 			return;
 		}
 		int[] slots = support.restockSlots(blockEntity);
-		ContainerAccess access = support.access(blockEntity);
+		ContainerAccess access = support.access(blockEntity, player);
 		if (slots == null || access == null) {
 			return;
 		}
@@ -845,6 +845,14 @@ public final class OutputSlotExtractor {
 	// 取物
 	/**
 	 * 从指定槽位取出物品到玩家背包。
+	 * <p>
+	 * 取出走 {@link ContainerAccess#take(int, int, PlayerEntity)}：
+	 * 菜单槽位（手动指认）会在这里走原版的"以玩家身份取出"，从而遵守模组写在槽位上的
+	 * {@code canTakeItems} 规则并触发 {@code onTakeItem} 钩子；其它容器退化为「读取 + 移除」。
+	 * <p>
+	 * 取之前先<b>模拟</b>一次背包容量：取出来的物品不会再放回容器（输出槽通常不允许放回），
+	 * 所以放不下就一点都别取。
+	 *
 	 * @param inventory 该容器对应的原版容器视图；用于 sided 校验，可为 null
 	 * @param sided 是否额外经过「该槽位能否被取出」的校验（规则里的 sided 字段）
 	 * @return 是否取出了物品
@@ -856,30 +864,33 @@ public final class OutputSlotExtractor {
 			if (result.isEmpty()) {
 				continue;
 			}
-			if (sided && !AutoDetectSupport.canExtract(inventory, slot, result)) {
+			if (sided && !SlotDetection.canExtract(inventory, slot, result)) {
 				// 容器明确声明这个槽位不允许被取出（升级槽/展示槽之类）
 				continue;
 			}
-			int taken = tryTakeSlot(player, result);
-			if (taken <= 0) {
+			// 单次最多取到物品堆叠上限，防止容器中存在超过堆叠上限的物品（Vinery 苹果压榨器的输出槽）
+			// 被原样塞进玩家背包
+			int want = Math.min(result.getCount(), result.getMaxCount());
+			if (want <= 0) {
 				continue;
 			}
-			access.remove(slot, taken);
+			int room = insertIntoPlayerInventory(player, result, true);
+			if (room <= 0) {
+				continue;
+			}
+			ItemStack portion = access.take(slot, Math.min(want, room), player);
+			if (portion.isEmpty()) {
+				continue;
+			}
+			if (insertIntoPlayerInventory(player, portion) <= 0) {
+				// 取出的数量已经按 room 限制过，正常到不了这里；
+				// 真到了（例如模组的 onTakeItem 钩子动了背包）也绝不静默吞物品：丢在玩家脚下
+				player.dropItem(portion, false);
+				continue;
+			}
 			takenAny = true;
 		}
 		return takenAny;
-	}
-
-	/**
-	 * 把容器物品送入玩家背包，返回实际放入的数量。
-	 * 单次最多取到物品堆叠上限，防止容器中存在超过堆叠上限的物品（Vinery 苹果压榨器的输出槽）
-	 * 被原样塞进玩家背包。
-	 */
-	private static int tryTakeSlot(PlayerEntity player, ItemStack result) {
-		int takeCount = Math.min(result.getCount(), result.getMaxCount());
-		ItemStack portion = result.copy();
-		portion.setCount(takeCount);
-		return insertIntoPlayerInventory(player, portion);
 	}
 
 	/**
@@ -891,6 +902,14 @@ public final class OutputSlotExtractor {
 	 * 这里只按真实容量放置，绝不多取。
 	 */
 	private static int insertIntoPlayerInventory(PlayerEntity player, ItemStack stack) {
+		return insertIntoPlayerInventory(player, stack, false);
+	}
+
+	/**
+	 * 同上，但 {@code simulate=true} 时只计算能放入多少、不改动背包也不标脏。
+	 * 取物前用它确认背包放得下，避免"先取出、放不进、又放不回去"而丢物品。
+	 */
+	private static int insertIntoPlayerInventory(PlayerEntity player, ItemStack stack, boolean simulate) {
 		if (stack.isEmpty()) {
 			return 0;
 		}
@@ -908,7 +927,9 @@ public final class OutputSlotExtractor {
 				continue;
 			}
 			int move = Math.min(room, remaining);
-			existing.increment(move);
+			if (!simulate) {
+				existing.increment(move);
+			}
 			remaining -= move;
 		}
 		// 2) 再放入空槽
@@ -917,13 +938,15 @@ public final class OutputSlotExtractor {
 				continue;
 			}
 			int move = Math.min(Math.min(stack.getMaxCount(), inventoryMax), remaining);
-			ItemStack copy = stack.copy();
-			copy.setCount(move);
-			main.set(i, copy);
+			if (!simulate) {
+				ItemStack copy = stack.copy();
+				copy.setCount(move);
+				main.set(i, copy);
+			}
 			remaining -= move;
 		}
 		int inserted = stack.getCount() - remaining;
-		if (inserted > 0) {
+		if (!simulate && inserted > 0) {
 			player.getInventory().markDirty();
 		}
 		return inserted;

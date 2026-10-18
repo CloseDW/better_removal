@@ -20,8 +20,9 @@ import java.util.ArrayList;
 /**
  * 模式选择滚轮：按住模式键时在快捷栏上方显示预设列表
  * （取出-输出/输入/燃料/全部、放入-输入/放入-燃料、补货），滚轮选择，松开提交。
- * 实验性的"主动探测"开启时（{@link InteractionModeManager#isClientProbeAvailable()}），
- * 列表末尾会多出第 8 个预设；关闭时不显示。
+ * 两个实验性预设按可用性追加在末尾：
+ * {@link InteractionModeManager#isClientProbeAvailable()} → 「主动探测」、
+ * {@link InteractionModeManager#isClientMappingAvailable()} → 「手动指认」；关闭时不显示。
  */
 public final class ModeWheel {
 
@@ -36,6 +37,8 @@ public final class ModeWheel {
 
 	/** 实验性预设：主动探测（不使用槽位模式） */
 	private static final InteractionMode PROBE_PRESET = new InteractionMode(Behavior.PROBE, SlotSet.ALL);
+	/** 实验性预设：手动指认（不使用槽位模式） */
+	private static final InteractionMode MAPPING_PRESET = new InteractionMode(Behavior.MAPPING, SlotSet.ALL);
 
 	private static boolean open;
 	private static int pendingIndex;
@@ -49,14 +52,21 @@ public final class ModeWheel {
 		return open;
 	}
 
-	/** 当前应显示的预设：主动探测可用时在末尾多一个 */
+	/** 当前应显示的预设：主动探测/手动指认可用时在末尾各多一个 */
 	private static List<InteractionMode> presets() {
-		if (!InteractionModeManager.isClientProbeAvailable()) {
+		boolean probe = InteractionModeManager.isClientProbeAvailable();
+		boolean mapping = InteractionModeManager.isClientMappingAvailable();
+		if (!probe && !mapping) {
 			return BASE_PRESETS;
 		}
-		List<InteractionMode> list = new ArrayList<>(BASE_PRESETS.size() + 1);
+		List<InteractionMode> list = new ArrayList<>(BASE_PRESETS.size() + 2);
 		list.addAll(BASE_PRESETS);
-		list.add(PROBE_PRESET);
+		if (probe) {
+			list.add(PROBE_PRESET);
+		}
+		if (mapping) {
+			list.add(MAPPING_PRESET);
+		}
 		return list;
 	}
 

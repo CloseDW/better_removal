@@ -5,10 +5,8 @@ import closedw.br.container.rule.RuleDirection;
 import closedw.br.container.rule.SlotRule;
 import closedw.br.container.rule.SlotRuleRegistry;
 import closedw.br.container.rule.SlotRules;
-import closedw.br.OutputSlotExtractor;
 import closedw.br.slot.SlotRole;
 import closedw.br.slot.SlotSet;
-
 
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.inventory.Inventory;
@@ -20,32 +18,33 @@ import net.minecraft.util.math.Direction;
 import org.slf4j.Logger;
 
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 
 /**
- * 未知容器的槽位判定。
- * 声明式规则{@link SlotRuleRegistry}）
- * 自动探测（{@link #isEnabledFor} 及其后）：靠白名单命中的启发式猜测，需要实验性总开关打开。
- * 两者都只作用于实现了 {@link Inventory} 的方块实体，且都注册在硬编码容器之后，
+ * 槽位判定：把"这个容器的每个槽位是什么角色"算出来。
+ * <p>
+ * 只包含两条路径：<b>声明式规则</b>（显式声明，始终生效）与
+ * <b>inventory 接口启发式</b>（只给主动探测用，不接管容器）。
+ * 早期版本的"白名单自动探测"与"菜单只读后端"已按需求删除：
+ * 前者靠猜测接管容器，后者与规则/手动指认的槽位口径不一致（菜单槽位号 ≠ 容器槽位号），
+ * 会打印出指错槽位的规则串。够不着的容器改由「手动指认」覆盖。
  */
-public final class AutoDetectSupport {
+public final class SlotDetection {
 
 	private static final Logger LOGGER = BetterRemoval.LOGGER;
 
-	/** 用于控制日志频率：同一种容器只在探测结果变化时打印一次。 */
+	/** 用于控制日志频率：同一种容器只在结果变化时打印一次。 */
 	private static final Map<String, String> LAST_LOGGED = new ConcurrentHashMap<>();
 
-	private AutoDetectSupport() {
+	private SlotDetection() {
 	}
 
-	// 声明式规则
-	/**
-	 * 该方块是否有手写槽位规则。规则是显式声明，不受实验性总开关约束。
-	 */
+	// ---------- 声明式规则 ----------
+
+	/** 该方块是否有声明式槽位规则。 */
 	public static boolean hasRule(BlockEntity blockEntity) {
 		if (blockEntity == null || !(blockEntity instanceof Inventory)) {
 			return false;
@@ -54,7 +53,7 @@ public final class AutoDetectSupport {
 	}
 
 	/**
-	 * 按手写规则取槽位。规则就是最终结果，不会再退回任何猜测：
+	 * 按声明式规则取「取出」方向的槽位。规则就是最终结果，不会再退回任何猜测：
 	 * 返回 null 表示「这条规则在该模式下没有槽位」。
 	 */
 	public static int[] getRuleSlotsForMode(BlockEntity blockEntity, SlotSet mode) {
@@ -88,7 +87,12 @@ public final class AutoDetectSupport {
 		return slots.length == 0 ? null : slots;
 	}
 
-	/** 按手写规则取「放入」方向的槽位；规格与 {@link #getRuleSlotsForMode} 一致。 */
+	/**
+	 * 按声明式规则取「放入」方向的槽位；规格与 {@link #getRuleSlotsForMode} 一致。
+	 * <p>
+	 * 注意这里走 {@link RuleDirection#DEPOSIT}（而不是取出方向）：规则允许两个方向声明不同的槽位
+	 * （典型是 Vinery 苹果压榨器），放入时必须用放入方向的槽表。
+	 */
 	public static int[] getRuleDepositSlots(BlockEntity blockEntity, SlotSet mode) {
 		if (mode != SlotSet.INPUT && mode != SlotSet.FUEL) {
 			return null;
@@ -118,7 +122,7 @@ public final class AutoDetectSupport {
 	/**
 	 * 「这个槽位现在能否被取出」的通用判定。
 	 * 只有实现了 {@link SidedInventory} 的容器才声明得起这件事：{@code canExtract} 返回 false 就表示
-	 * 该槽位不允许被自动化取出（升级槽、展示槽之类）。没有 sided 信息的容器一律视为可取出，
+	 * 该槽位不允许被自动化取出（升级槽、展示槽之类）。没有 sided 信息的容器一律视为可取出。
 	 * @param inventory 容器的原版视图，可为 null（此时无法判定，按可取出处理）
 	 */
 	public static boolean canExtract(Inventory inventory, int slot, ItemStack stack) {
@@ -185,105 +189,21 @@ public final class AutoDetectSupport {
 		LOGGER.warn("[container] rule for {} ({}): {}", key, rule.match(), message);
 	}
 
-	// 自动探测（实验性，需要白名单命中）
-	/**
-	 * 该方块是否应由自动探测接管（需要实验性总开关 + 白名单命中）。
-	 */
-	public static boolean isEnabledFor(BlockEntity blockEntity) {
-		if (blockEntity == null) {
-			return false;
-		}
-		if (!OutputSlotExtractor.isExperimentalEnabled()) {
-			return false;
-		}
-		if (!(blockEntity instanceof Inventory)) {
-			// 没有实现原版容器接口的方块（纯自定义库存）槽位号没有意义，无法按槽位取出
-			return false;
-		}
-		return matchesWhitelist(blockEntity);
-	}
-
-	/**
-	 * 取出模式：返回自动探测出的槽位。返回 null 表示该模式下无可用槽位。
-	 */
-	public static int[] getSlotsForMode(BlockEntity blockEntity, SlotSet mode) {
-		if (mode == null || !(blockEntity instanceof Inventory inventory)) {
-			return null;
-		}
-		Detection detection = detect(blockEntity, inventory);
-		if (detection == null) {
-			return null;
-		}
-		logDetection(blockEntity, detection.source(), detection.roles());
-		return slotsForMode(detection.roles(), mode);
-	}
-
-	/**
-	 * 放入模式：INPUT/FUEL 分别返回探测出的输入/燃料槽位。
-	 */
-	public static int[] getDepositSlots(BlockEntity blockEntity, SlotSet mode) {
-		if (mode != SlotSet.INPUT && mode != SlotSet.FUEL) {
-			return null;
-		}
-		return getSlotsForMode(blockEntity, mode);
-	}
-
-	private static int[] slotsForMode(SlotRole[] roles, SlotSet mode) {
-		Set<Integer> slots = new LinkedHashSet<>();
+	private static void logDetection(BlockEntity blockEntity, String source, SlotRole[] roles) {
+		Identifier id = SlotRules.blockId(blockEntity);
+		String key = (id != null ? id.toString() : blockEntity.getClass().getName());
+		StringBuilder signature = new StringBuilder(source).append(" |");
 		for (int slot = 0; slot < roles.length; slot++) {
-			switch (mode) {
-				case OUTPUT -> {
-					if (roles[slot] == SlotRole.OUTPUT) {
-						slots.add(slot);
-					}
-				}
-				case INPUT -> {
-					if (roles[slot] == SlotRole.INPUT) {
-						slots.add(slot);
-					}
-				}
-				case FUEL -> {
-					if (roles[slot] == SlotRole.FUEL) {
-						slots.add(slot);
-					}
-				}
-				case ALL -> {
-					if (roles[slot] != SlotRole.NONE) {
-						slots.add(slot);
-					}
-				}
-			}
+			signature.append(' ').append(slot).append('=').append(roles[slot].name());
 		}
-		if (slots.isEmpty()) {
-			return null;
+		String value = signature.toString();
+		if (value.equals(LAST_LOGGED.put(key, value))) {
+			return;
 		}
-		int[] result = new int[slots.size()];
-		int index = 0;
-		for (int slot : slots) {
-			result[index++] = slot;
-		}
-		return result;
+		LOGGER.info("[container] {} -> {}", key, value);
 	}
 
-	/**
-	 * 依次尝试各个探测后端，返回第一个能给出结果的那个。
-	 */
-	private static Detection detect(BlockEntity blockEntity, Inventory inventory) {
-		// 优先级1：GUI 菜单语义（只读判定）
-		SlotRole[] menuRoles = MenuSlotSupport.detect(blockEntity);
-		if (menuRoles != null && menuRoles.length == inventory.size()) {
-			return new Detection(menuRoles, "menu");
-		}
-
-		// 优先级2：容器接口启发式
-		SlotRole[] roles = inventoryRoles(inventory);
-		for (SlotRole role : roles) {
-			if (role != SlotRole.NONE) {
-				return new Detection(roles, "inventory");
-			}
-		}
-		return null;
-	}
+	// ---------- inventory接口启发式（只给主动探测用） ----------
 
 	/**
 	 * 只用原版容器接口推断：接受通用探测物 → 输入/燃料；
@@ -354,43 +274,5 @@ public final class AutoDetectSupport {
 			}
 		}
 		return false;
-	}
-
-	/**
-	 * 白名单匹配规则与 {@link SlotRules#matchesEntry} 完全一致（忽略大小写）：
-	 * {@code *} / 模组ID / {@code 模组ID:*} / {@code 模组ID:方块ID} / {@code @类名前缀}。
-	 */
-	private static boolean matchesWhitelist(BlockEntity blockEntity) {
-		List<String> whitelist = OutputSlotExtractor.getConfigList("auto_detect_whitelist");
-		if (whitelist.isEmpty()) {
-			// 兼容旧键名
-			whitelist = OutputSlotExtractor.getConfigList("experimental_auto_detect_whitelist");
-		}
-		if (whitelist.isEmpty()) {
-			return false;
-		}
-		for (String entry : whitelist) {
-			if (SlotRules.matchesEntry(blockEntity, entry)) {
-				return true;
-			}
-		}
-		return false;
-	}
-
-	private static void logDetection(BlockEntity blockEntity, String source, SlotRole[] roles) {
-		Identifier id = SlotRules.blockId(blockEntity);
-		String key = (id != null ? id.toString() : blockEntity.getClass().getName());
-		StringBuilder signature = new StringBuilder(source).append(" |");
-		for (int slot = 0; slot < roles.length; slot++) {
-			signature.append(' ').append(slot).append('=').append(roles[slot].name());
-		}
-		String value = signature.toString();
-		if (value.equals(LAST_LOGGED.put(key, value))) {
-			return;
-		}
-		LOGGER.info("[container] {} -> {}", key, value);
-	}
-
-	private record Detection(SlotRole[] roles, String source) {
 	}
 }

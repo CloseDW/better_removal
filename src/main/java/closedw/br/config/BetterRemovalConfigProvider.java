@@ -8,6 +8,10 @@ import java.util.Set;
 
 /**
  * Configured 的配置提供： custom.configured.providers中注册
+ * <p>
+ * 同一个 mod id 下暴露两个 {@link IModConfig}：
+ * ① 可编辑的 {@link BetterRemovalConfig}（config/better-removal.properties）；
+ * ② 只读的 {@link BetterRemovalMappingsConfig}（「已指认的容器」视图，不落盘）。
  */
 public class BetterRemovalConfigProvider implements IModConfigProvider
 {
@@ -18,6 +22,6 @@ public class BetterRemovalConfigProvider implements IModConfigProvider
         {
             return Set.of();
         }
-        return Set.of(BetterRemovalConfig.get());
+        return Set.of(BetterRemovalConfig.get(), BetterRemovalMappingsConfig.get());
     }
 }

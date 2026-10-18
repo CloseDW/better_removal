@@ -1,10 +1,14 @@
 {
   "required": true,
   "minVersion": "0.8",
-  "package": "closedw.br.mixin.client",
+  "package": "closedw.br.mixin",
   "compatibilityLevel": "JAVA_17",
+  "mixins": [
+    "server.ServerPlayerCloseScreenMixin"
+  ],
   "client": [
-    "MouseScrollMixin"
+    "client.MouseScrollMixin",
+    "client.HandledScreenMappingMixin"
   ],
   "injectors": {
     "defaultRequire": 1

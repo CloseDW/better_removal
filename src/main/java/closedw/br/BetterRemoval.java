@@ -3,9 +3,11 @@ package closedw.br;
 import closedw.br.behavior.InteractionModeManager;
 import closedw.br.command.BetterRemovalCommand;
 import closedw.br.config.BetterRemovalConfig;
+import closedw.br.container.menu.MenuMapStore;
 import closedw.br.container.rule.SlotRuleRegistry;
 import closedw.br.container.support.ContainerRegistry;
 import closedw.br.ftbultimine.FTBUltimineSupport;
+import closedw.br.mapping.MappingSessionManager;
 import closedw.br.networking.ExtractKeyStateManager;
 
 
@@ -39,9 +41,14 @@ public class BetterRemoval implements ModInitializer {
 		OutputSlotExtractor.register();
 		// 槽位规则：读取声明式规则（内置 json / 其它模组自声明）并做自检
 		SlotRuleRegistry.load();
+		// 手动指认映射：config/better-removal/menu-maps.json + 各模组 jar 内同名文件
+		MenuMapStore.load();
 		// 规则里的容器开关由规则推导，所以要在规则读完之后再登记进配置
 		BetterRemovalConfig.get().registerRuleContainers(
 				SlotRuleRegistry.configKeys(), SlotRuleRegistry.configGroups());
+		// 分组变化后，Configured 的界面缓存必须作废：每次规则重载都重新登记一遍容器开关
+		SlotRuleRegistry.addReloadListener(count -> BetterRemovalConfig.get().registerRuleContainers(
+				SlotRuleRegistry.configKeys(), SlotRuleRegistry.configGroups()));
 		// 容器注册自检必须在这之后跑：配置项建好之前检查"配置键是否存在"会全部误报
 		ContainerRegistry.validate();
 		// 方块 ID 的存在性校验要等注册表冻结（onInitialize 阶段各模组的方块还在注册中途），
@@ -49,6 +56,7 @@ public class BetterRemoval implements ModInitializer {
 		ServerLifecycleEvents.SERVER_STARTING.register(server -> SlotRuleRegistry.revalidateBlockIds());
 		ExtractKeyStateManager.registerServerHandlers();
 		InteractionModeManager.registerServerHandlers();
+		MappingSessionManager.registerServerHandlers();
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
 				BetterRemovalCommand.register(dispatcher));
 

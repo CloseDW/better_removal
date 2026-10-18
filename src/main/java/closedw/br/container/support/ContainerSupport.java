@@ -37,6 +37,14 @@ public interface ContainerSupport {
 	/** 该容器的槽位读写；不可寻址时返回 null。 */
 	ContainerAccess access(BlockEntity blockEntity);
 
+	/**
+	 * 带操作玩家的槽位读写。菜单槽位（手动指认映射）需要一个玩家实例来构造临时菜单，
+	 * 所以那类实现覆盖这个方法；其它实现默认忽略玩家。
+	 */
+	default ContainerAccess access(BlockEntity blockEntity, net.minecraft.entity.player.PlayerEntity player) {
+		return access(blockEntity);
+	}
+
 	/** 取出模式下要取出的槽位；该模式不适用返回 null。 */
 	int[] extractSlots(BlockEntity blockEntity, SlotSet mode);
 

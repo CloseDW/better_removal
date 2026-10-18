@@ -1,6 +1,7 @@
 package closedw.br.behavior;
 
 import closedw.br.BetterRemoval;
+import closedw.br.mapping.MappingSessionManager;
 import closedw.br.networking.ExtractionModeSetC2SPacket;
 import closedw.br.networking.ExtractionModeSyncS2CPacket;
 import closedw.br.OutputSlotExtractor;
@@ -46,6 +47,9 @@ public final class InteractionModeManager {
 
 	/** 客户端缓存的"主动探测是否可用"，模式滚轮据此决定是否多显示一个预设 */
 	private static volatile boolean CLIENT_PROBE_AVAILABLE = false;
+
+	/** 客户端缓存的"手动指认是否可用"，模式滚轮据此决定是否多显示一个预设 */
+	private static volatile boolean CLIENT_MAPPING_AVAILABLE = false;
 
 	static {
 		load();
@@ -121,23 +125,42 @@ public final class InteractionModeManager {
 		return CLIENT_PROBE_AVAILABLE;
 	}
 
-	public static void setClientState(InteractionMode state, boolean probeAvailable) {
+	/** 客户端缓存的"手动指认是否可用"（供模式滚轮读取）。 */
+	public static boolean isClientMappingAvailable() {
+		return CLIENT_MAPPING_AVAILABLE;
+	}
+
+	public static void setClientState(InteractionMode state, boolean probeAvailable, boolean mappingAvailable) {
 		CLIENT_STATE = state;
 		CLIENT_PROBE_AVAILABLE = probeAvailable;
+		CLIENT_MAPPING_AVAILABLE = mappingAvailable;
 	}
 
 	/**
-	 * 主动探测是否可用：实验性总开关 + 主动探测开关（experimental_transfer_probe）都打开。
-	 * 未安装 Configured 时读不到开关，按不可用处理。
+	 * 主动探测是否可用：只看 {@code experimental_transfer_probe} 这一个开关。
+	 * （早期版本还要求实验性总开关 {@code experimental_auto_detect}，那个总开关连同白名单自动探测一起删掉了。）
+	 * 用 {@link OutputSlotExtractor#isExperimentalSwitchOn} 而不是 isContainerEnabled：
+	 * 读不到配置时按"关闭"处理，维持"默认关闭"的约定。
 	 */
 	public static boolean isProbeAvailable() {
-		return OutputSlotExtractor.isExperimentalEnabled()
-				&& OutputSlotExtractor.isContainerEnabled("experimental_transfer_probe");
+		return OutputSlotExtractor.isExperimentalSwitchOn("experimental_transfer_probe");
 	}
 
-	/** 重新向客户端同步模式与"主动探测是否可用"（配置改完后由 /br reload 调用）。 */
+	/**
+	 * 手动指认是否可用：只看 {@code menu_mapping} 开关（实验性，默认关闭）。
+	 */
+	public static boolean isMappingAvailable() {
+		return OutputSlotExtractor.isExperimentalSwitchOn("menu_mapping");
+	}
+
+	/** 重新向客户端同步模式与两个"可用性"标志（配置改完后由 /br reload 调用）。 */
 	public static void refreshClient(ServerPlayerEntity player) {
-		ServerPlayNetworking.send(player, new ExtractionModeSyncS2CPacket(getState(player), isProbeAvailable()));
+		sendSync(player, getState(player));
+	}
+
+	/** 统一的同步出口：模式 + 主动探测可用 + 手动指认可用，一次下发。 */
+	public static void sendSync(ServerPlayerEntity player, InteractionMode state) {
+		ServerPlayNetworking.send(player, new ExtractionModeSyncS2CPacket(state, isProbeAvailable(), isMappingAvailable()));
 	}
 
 	/** 注册模式设置数据包的接收器，并处理玩家加入时的模式同步。 */
@@ -148,15 +171,16 @@ public final class InteractionModeManager {
 		});
 
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
-			ServerPlayNetworking.send(handler.player, new ExtractionModeSyncS2CPacket(getState(handler.player), isProbeAvailable()));
+			// 服务端在玩家加入时把修饰键状态重置为"未按下"（见 ExtractKeyStateManager），并重新同步模式
+			sendSync(handler.player, getState(handler.player));
 		});
 	}
 
-	/** 防御非法组合：放入预设只允许 input/fuel；补货固定全部（槽位范围由补货行为决定） */
+	/** 防御非法组合：放入预设只允许 input/fuel；补货与主动探测/手动指认固定全部（槽位范围由行为自己决定） */
 	private static InteractionMode sanitize(InteractionMode state) {
-		if (state.behavior() == Behavior.PROBE) {
-			// 主动探测不使用槽位模式（与补货同理，槽位名不显示）
-			return new InteractionMode(Behavior.PROBE, SlotSet.ALL);
+		if (state.behavior() == Behavior.PROBE || state.behavior() == Behavior.MAPPING) {
+			// 这两个行为都不使用槽位模式（与补货同理，槽位名不显示）
+			return new InteractionMode(state.behavior(), SlotSet.ALL);
 		}
 		if (state.behavior() == Behavior.DEPOSIT && state.slots() != SlotSet.INPUT && state.slots() != SlotSet.FUEL) {
 			return new InteractionMode(Behavior.DEPOSIT, SlotSet.INPUT);
@@ -171,15 +195,21 @@ public final class InteractionModeManager {
 		state = sanitize(state);
 		STATES.put(player.getUuid(), state);
 		save();
-		ServerPlayNetworking.send(player, new ExtractionModeSyncS2CPacket(state, isProbeAvailable()));
+		if (state.behavior() != Behavior.MAPPING) {
+			// 切走指认模式就结束当前会话，免得客户端还挂着叠层标签
+			MappingSessionManager.end(player);
+		}
+		sendSync(player, state);
 		return state;
 	}
 
 	/**
-	 * 生成模式提示文本，如：当前模式【取出 · 输出槽】；补货没有槽位预设，只显示行为名
+	 * 生成模式提示文本，如：当前模式【取出 · 输出槽】；补货/主动探测/手动指认没有槽位预设，只显示行为名
+	 * 前缀直接下发 {@code Text.translatable}，由客户端按自己的语言渲染——
+	 * 早期版本在服务端就 {@code getString()} 拍平成字符串，于是中文服配英文客户端也会显示中文。
 	 */
 	public static Text getStateMessage(InteractionMode state) {
-		MutableText prefix = Text.literal(Text.translatable("better-removal.message.state_prefix").getString())
+		MutableText prefix = Text.translatable("better-removal.message.state_prefix")
 				.setStyle(Style.EMPTY.withColor(Formatting.YELLOW));
 		MutableText open = Text.literal("【").setStyle(Style.EMPTY.withColor(Formatting.AQUA));
 		MutableText action = Text.translatable(state.behavior().getTranslationKey())

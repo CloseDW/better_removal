@@ -46,8 +46,9 @@ public final class ContainerRegistry {
 		// 原版容器与各模组容器的槽位布局都在 src/main/resources/better-removal/containers/*.json
 		reg(new RuleContainerSupport());
 
-		// ---------- 实验性：白名单自动探测（总开关默认关闭）----------
-		reg(new AutoDetectContainerSupport());
+		// ---------- 手动指认（玩家在 GUI 里标出来的槽位）----------
+		// 排在声明式规则之后：同一个方块有规则时规则优先，没有规则才轮到玩家指认的映射
+		reg(new MenuContainerSupport());
 	}
 
 	/**
@@ -85,7 +86,7 @@ public final class ContainerRegistry {
 	/**
 	 * 找出第一个匹配且可用的容器类型；没有则返回 null。
 	 * 匹配上但被显式关闭的容器（{@link ContainerSupport#explicitlyDisabled}）会让查询就此终止并返回 null，
-	 * 而不是继续往下走到兜底实现——否则玩家关掉一条规则后，同一个方块会被自动探测「猜着」复活。
+	 * 而不是继续往下走到兜底实现——否则玩家关掉一条规则后，同一个方块会被手动指认里那条旧映射接管。
 	 * 由容器自己的配置键关掉的实现（{@link ContainerSupport#enabled()}）则只是被跳过，查询继续。
 	 */
 	public static ContainerSupport find(BlockEntity blockEntity) {

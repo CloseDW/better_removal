@@ -25,6 +25,25 @@ public interface ContainerAccess {
 	void remove(int slot, int count);
 
 	/**
+	 * 取出物品并返回实际取到的堆叠（默认实现 = 读取 + {@link #remove}）。
+	 * 菜单槽位会覆盖这个方法走原版的 {@code Slot#takeStackRange}，从而遵守模组写在槽位上的
+	 * {@code canTakeItems} 规则、并触发 {@code onTakeItem} 钩子——即"以玩家身份取出"。
+	 * 调用方必须先确认背包放得下，取出的堆叠不会再放回容器。
+	 * @param player 操作者；菜单实现需要它
+	 */
+	default ItemStack take(int slot, int count, net.minecraft.entity.player.PlayerEntity player) {
+		ItemStack existing = get(slot);
+		if (existing.isEmpty() || count <= 0) {
+			return ItemStack.EMPTY;
+		}
+		int take = Math.min(count, existing.getCount());
+		ItemStack result = existing.copy();
+		result.setCount(take);
+		remove(slot, take);
+		return result;
+	}
+
+	/**
 	 * 标记容器为脏，并执行该容器所需的同步副作用
 	 * （如 Ad Astra 机器需要额外 sync()）。
 	 */

@@ -1,7 +1,7 @@
 package closedw.br.container.support;
 
 import closedw.br.container.access.InventoryAccess;
-import closedw.br.container.detect.AutoDetectSupport;
+import closedw.br.container.detect.SlotDetection;
 import closedw.br.container.rule.SlotRule;
 import closedw.br.container.rule.SlotRuleRegistry;
 import closedw.br.OutputSlotExtractor;
@@ -32,7 +32,7 @@ public final class RuleContainerSupport implements ContainerSupport {
 
 	@Override
 	public boolean matches(BlockEntity blockEntity) {
-		return AutoDetectSupport.hasRule(blockEntity);
+		return SlotDetection.hasRule(blockEntity);
 	}
 
 	@Override
@@ -59,11 +59,11 @@ public final class RuleContainerSupport implements ContainerSupport {
 
 	@Override
 	public int[] extractSlots(BlockEntity blockEntity, SlotSet mode) {
-		return AutoDetectSupport.getRuleSlotsForMode(blockEntity, mode);
+		return SlotDetection.getRuleSlotsForMode(blockEntity, mode);
 	}
 
 	@Override
 	public int[] depositSlots(BlockEntity blockEntity, SlotSet mode) {
-		return AutoDetectSupport.getRuleDepositSlots(blockEntity, mode);
+		return SlotDetection.getRuleDepositSlots(blockEntity, mode);
 	}
 }

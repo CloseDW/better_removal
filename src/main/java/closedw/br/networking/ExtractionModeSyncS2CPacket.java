@@ -11,19 +11,20 @@ import net.minecraft.network.PacketByteBuf;
 
 /**
  * 服务端 -> 客户端：同步当前模式（行为+槽位），供 Jade 联动等客户端功能读取。
- * 同时告诉客户端"主动探测"模式是否可用（实验性开关），模式滚轮据此决定是否多显示一个预设。
+ * 同时告诉客户端"主动探测"与"手动指认"模式是否可用，模式滚轮据此决定要不要多显示预设。
  */
-public record ExtractionModeSyncS2CPacket(Behavior behavior, SlotSet slots, boolean probeAvailable) implements FabricPacket {
+public record ExtractionModeSyncS2CPacket(Behavior behavior, SlotSet slots, boolean probeAvailable,
+		boolean mappingAvailable) implements FabricPacket {
 
 	public static final PacketType<ExtractionModeSyncS2CPacket> TYPE =
-			PacketType.create(BetterRemoval.id("extraction_mode_sync"), buf -> new ExtractionModeSyncS2CPacket(buf));
+			PacketType.create(BetterRemoval.id("extraction_mode_sync"), ExtractionModeSyncS2CPacket::new);
 
 	public ExtractionModeSyncS2CPacket(PacketByteBuf buf) {
-		this(buf.readEnumConstant(Behavior.class), buf.readEnumConstant(SlotSet.class), buf.readBoolean());
+		this(buf.readEnumConstant(Behavior.class), buf.readEnumConstant(SlotSet.class), buf.readBoolean(), buf.readBoolean());
 	}
 
-	public ExtractionModeSyncS2CPacket(InteractionMode state, boolean probeAvailable) {
-		this(state.behavior(), state.slots(), probeAvailable);
+	public ExtractionModeSyncS2CPacket(InteractionMode state, boolean probeAvailable, boolean mappingAvailable) {
+		this(state.behavior(), state.slots(), probeAvailable, mappingAvailable);
 	}
 
 	@Override
@@ -31,6 +32,7 @@ public record ExtractionModeSyncS2CPacket(Behavior behavior, SlotSet slots, bool
 		buf.writeEnumConstant(this.behavior);
 		buf.writeEnumConstant(this.slots);
 		buf.writeBoolean(this.probeAvailable);
+		buf.writeBoolean(this.mappingAvailable);
 	}
 
 	@Override

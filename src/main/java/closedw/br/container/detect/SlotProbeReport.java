@@ -21,18 +21,21 @@ import java.util.function.Supplier;
 
 /**
  * 实验性：主动探测。
- * 玩家处于"主动探测"模式时，按住修饰键右击容器，服务端依次跑两个探测后端：
- * ① 菜单只读：读容器自己 GUI 菜单里 {@code canInsert}/{@code canTakeItems}/{@code isEnabled} 声明；
- * ② 库存接口：直接问 {@link Inventory#isValid} / {@code SidedInventory.canExtract}。
- * 每个后端输出一行可点击复制的规则串，粘进 Configured 的"容器槽位规则（声明式）"即可。
- * 某个后端判定不出任何槽位时显示"无法探测"。只输出文本。
+ * 玩家处于"主动探测"模式时，按住修饰键右击容器，服务端只跑一个后端：
+ * 直接问 {@link Inventory#isValid} / {@code SidedInventory.canExtract}（inventory 接口）。
+ * 输出一行可点击复制的规则串，粘进 Configured 的"容器槽位规则（声明式）"即可。
+ * 判定不出任何槽位时显示"无法探测"。只输出文本。
+ * <p>
+ * 早期版本还会跑一个"菜单只读"后端，已按需求删除：菜单槽位号与容器槽位号是两套编号，
+ * 拿菜单语义去推容器槽位会打印出指错槽位的规则串。够不着的容器改用「手动指认」覆盖
+ * （见 {@code closedw.br.container.menu}）。
  */
 public final class SlotProbeReport {
 
 	private SlotProbeReport() {
 	}
 
-	/** 跑两次探测并把结果打印到该玩家的聊天框。 */
+	/** 跑探测并把结果打印到该玩家的聊天框。 */
 	public static void send(ServerPlayerEntity player, BlockEntity blockEntity) {
 		String match = matchKey(blockEntity);
 		int size = size(blockEntity);
@@ -40,8 +43,6 @@ public final class SlotProbeReport {
 		player.sendMessage(Text.translatable("better-removal.message.probe_header", match)
 				.formatted(Formatting.AQUA), false);
 
-		report(player, "better-removal.message.probe_menu", match, size,
-				probe(() -> MenuSlotSupport.detect(blockEntity)), Formatting.GREEN);
 		report(player, "better-removal.message.probe_inventory", match, size,
 				probe(() -> inventoryRoles(blockEntity)), Formatting.LIGHT_PURPLE);
 	}
@@ -141,7 +142,7 @@ public final class SlotProbeReport {
 		if (!(blockEntity instanceof Inventory inventory)) {
 			return null;
 		}
-		return AutoDetectSupport.inventoryRoles(inventory);
+		return SlotDetection.inventoryRoles(inventory);
 	}
 
 	/** 容器槽位数；不是 {@link Inventory} 时返回 -1 */

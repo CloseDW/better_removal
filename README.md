@@ -13,13 +13,17 @@ out of it — **without opening its GUI**.
 | Extract · Input / Fuel / All | Extracts the named slots |
 | Deposit · Input / Fuel | Deposits into the named slots |
 | Restock | Refills input/fuel slots with matching items from your inventory (empty slots are skipped) |
+| Manual Mapping | Opens the container's GUI so you can tag its slots |
 
 Deposits respect the container's own slot filters (a furnace's fuel slot only accepts fuel).
 
+**Dependency**: Configured is required; Jade is optional (tooltip preview).
+
 | Command | Effect |
 |---|---|
-| `/br` or `/br now` | Shows your current preset |
-| `/br reload` | Re-reads the slot rules (no restart needed after editing config) |
+| `/br list [filter]` | Lists the containers you mapped (click `[-]` at the end of a line to delete that mapping) |
+| `/br delete <pattern>` | Deletes one mapping (you can also type it, or click `[-]` at the end of a `/br list` line) |
+| `/br reload` | Re-reads the slot rules and the mappings (no restart needed after editing config) |
 
 ## Supported Containers
 
@@ -45,8 +49,43 @@ is what the built-in rules cover.
 | Fossils and Archeology Culture Vat · Worktable | yes | input / fuel |
 | Iron Furnaces (all tiers) | yes | input / fuel |
 
-> ※ These two are the only containers that **must stay hardcoded**: their block entities do not
-> implement vanilla `Inventory`, so their slots cannot be addressed by a rule.
+> ※ These two are the only containers that **cannot be reached by a rule**: their block entities do not
+> implement vanilla `Inventory`, so their slots cannot be addressed by slot number, which is why they are
+> hard-coded in the code instead.
+> Because those hard-coded implementations come *before* Manual Mapping, **Manual Mapping cannot take
+> them over by default** - the same block always hits the built-in support first, and only after that
+> container switch is turned off does the manual mapping get a chance.
+
+## Manual Mapping (any other container)
+
+> **Experimental, off by default**: enable **Manual slot mapping** under Experimental in Configured
+> first — only then does the mode wheel offer *Manual Mapping*.
+
+Some mods keep their inventory in a private `ItemStackHandler` and never implement `Inventory`. Slot
+numbers are meaningless there — but their **GUI menu** can always reach the slots, because a menu
+`Slot` holds a direct reference to the container behind it. Manual Mapping uses exactly that.
+
+1. Pick **Manual Mapping** on the mode wheel (hold the mode key and scroll).
+2. Hold the modifier and right-click the container: this time the GUI **opens normally** (nothing is
+   moved or blocked).
+3. The wheel switches brushes in the order **Input → Output → Fuel → Ignore** (scrolling down moves
+   one step forward; the first scroll selects *Input* to start with). Hold the modifier and **sweep
+   the mouse over / rest it on a slot** (about 0.1 s) to paint the current brush onto it. Coloured
+   regions with a small corner letter (I / F / O) show what each slot is tagged as.
+4. Close the GUI. The mapping is saved to `config/better-removal/menu-maps.json` on the server.
+
+From then on the container behaves like the built-in ones: extract / deposit / restock without its
+GUI, and the tags decide which slots each action touches.
+
+Things worth knowing:
+
+- A mapping is keyed by the block id.
+- While tagging, the mod verifies it can rebuild the menu **without** the GUI; if it cannot (for example
+  the GUI is created by the block instead of the block entity), you are told immediately and the mapping
+  is not saved.
+- If a container already has a built-in rule, that rule wins. Manual mappings are only consulted when no
+  rule matches.
+- `/br reload` re-reads `menu-maps.json`.
 
 ## Compatibility
 
@@ -64,12 +103,6 @@ Edit via the **Configured** mod. Every container is enabled by default, and only
 actually have installed show up as categories.
 
 ---
-
-## Adding Container Support
-
-To support a container that is not covered, you do not need code changes or a mod update — write one
-line in the Configured `Declared container slot rules` list. Declared rules are explicit
-declarations, so they are **always active** and unaffected by the experimental switches.
 
 ### One-line format
 
@@ -118,21 +151,19 @@ Applied after `/br reload`. While loading rules the mod logs: a block id that do
 config key used by several rules, slot numbers beyond the declared `size`, and rules that declare no
 slots at all.
 
-### Experimental: auto-detection
+### Active probe: let the mod read the slots for you
 
-Instead of writing a rule, you can let the mod guess. Off by default; enable `Auto-detect containers`
-and add blocks to the whitelist.
+With **Active probe mode** enabled (off by default) the mode wheel gains an *Active Probe* entry:
+hold the modifier and right-click any container and the mod asks its own inventory interface
+(`Inventory#isValid` / `SidedInventory#canExtract`), printing one click-to-copy rule
+string you can paste into Configured's *Declared container slot rules*. Probing only prints text and
+never takes over a container.
+(The `[container] <block> -> 0=INPUT 1=FUEL 2=OUTPUT ...` line in the log comes from a **declared
+rule** being applied; probing itself does not log anything.)
 
-- **Auto-detection**: reads the container's own GUI menu first, then falls back to
-  `Inventory.isValid` heuristics. The result is logged as
-  `[container] <block> -> 0=INPUT 1=FUEL 2=OUTPUT ...` so you can check before trusting it.
-- **Active probe mode**: adds an *Active Probe* entry to the mode wheel. Hold the modifier and
-  right-click any container and both detectors run, each printing one click-to-copy rule string you
-  can paste straight into Configured.
-
-The only containers a rule cannot reach are those the game cannot address slot by slot: a block
-entity that does not implement `Inventory`, or a GUI whose slots point at a private inner container.
-Those keep their dedicated built-in support.
+It only covers containers that implement vanilla `Inventory` - slot numbers mean nothing otherwise.
+For containers whose GUI has slots but whose block entity does not implement `Inventory`
+(cooking pot, machines, ...), use **Manual Mapping** instead.
 
 ---
 

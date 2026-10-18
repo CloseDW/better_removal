@@ -34,6 +34,6 @@ public final class ExtractKeyStateManager {
 	}
 
 	public static boolean isAltKeyDown(PlayerEntity player) {
-		return ALT_STATES.getOrDefault(player.getUuid(), false);
+		return player != null && ALT_STATES.getOrDefault(player.getUuid(), false);
 	}
 }
