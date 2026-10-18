@@ -22,7 +22,8 @@ Deposits respect the container's own slot filters (a furnace's fuel slot only ac
 | Command | Effect |
 |---|---|
 | `/br list [filter]` | Lists the containers you mapped (click `[-]` at the end of a line to delete that mapping) |
-| `/br reload` | Re-reads the slot rules (no restart needed after editing config) |
+| `/br delete <pattern>` | Deletes one mapping (you can also type it, or click `[-]` at the end of a `/br list` line) |
+| `/br reload` | Re-reads the slot rules and the mappings (no restart needed after editing config) |
 
 ## Supported Containers
 
@@ -49,8 +50,11 @@ is what the built-in rules cover.
 | Iron Furnaces (all tiers) | yes | input / fuel |
 
 > ※ These two are the only containers that **cannot be reached by a rule**: their block entities do not
-> implement vanilla `Container`, so their slots cannot be addressed by slot number. They can, however,
-> be handled by **Manual Mapping** (see below), which addresses GUI slots instead.
+> implement vanilla `Container`, so their slots cannot be addressed by slot number, which is why they are
+> hard-coded in the code instead.
+> Because those hard-coded implementations come *before* Manual Mapping, **Manual Mapping cannot take
+> them over by default** - the same block always hits the built-in support first, and only after that
+> container switch is turned off does the manual mapping get a chance.
 
 ## Manual Mapping (any other container)
 
@@ -64,10 +68,10 @@ numbers are meaningless there — but their **GUI menu** can always reach the sl
 1. Pick **Manual Mapping** on the mode wheel (hold the mode key and scroll).
 2. Hold the modifier and right-click the container: this time the GUI **opens normally** (nothing is
    moved or blocked).
-3. Hold the modifier and **sweep the mouse over / rest it on a slot** (about 0.1 s) to paint the
-   current brush onto it; the wheel switches brushes in the order
-   **Input → Fuel → Output → Ignore**. Coloured regions with a small corner letter (I / F / O) show
-   what each slot is tagged as.
+3. The wheel switches brushes in the order **Input → Output → Fuel → Ignore** (scrolling down moves
+   one step forward; the first scroll selects *Input* to start with). Hold the modifier and **sweep
+   the mouse over / rest it on a slot** (about 0.1 s) to paint the current brush onto it. Coloured
+   regions with a small corner letter (I / F / O) show what each slot is tagged as.
 4. Close the GUI. The mapping is saved to `config/better-removal/menu-maps.json` on the server.
 
 From then on the container behaves like the built-in ones: extract / deposit / restock without its
@@ -153,8 +157,7 @@ With **Active probe mode** enabled (off by default) the mode wheel gains an *Act
 hold the modifier and right-click any container and the mod asks its own inventory interface
 (`Container.canPlaceItem` / `WorldlyContainer.canTakeItemThroughFace`), printing one click-to-copy rule
 string you can paste into Configured's *Declared container slot rules*. Probing only prints text and
-never takes over a container; the same result is logged as
-`[container] <block> -> 0=INPUT 1=FUEL 2=OUTPUT ...`.
+never takes over a container.
 
 It only covers containers that implement vanilla `Container` - slot numbers mean nothing otherwise.
 For containers whose GUI has slots but whose block entity does not implement `Container`
