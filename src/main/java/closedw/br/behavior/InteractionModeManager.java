@@ -134,17 +134,21 @@ public final class InteractionModeManager {
 
     /**
      * 主动探测是否可用：只看 experimental_transfer_probe 这一个开关。
-     * 未安装 Configured 时读不到开关，按不可用处理。
+     * <p>
+     * 用 {@link OutputSlotExtractor#isExperimentalSwitchOn} 而不是 {@code isContainerEnabled}：
+     * 读不到配置时按<b>关闭</b>处理。容器开关缺失配置时按"开启"处理（宁可照旧也不要静默失效），
+     * 但实验性功能必须相反——否则它会绕过"默认关闭"的约定自己冒出来。
      */
     public static boolean isProbeAvailable() {
-        return OutputSlotExtractor.isContainerEnabled("experimental_transfer_probe");
+        return OutputSlotExtractor.isExperimentalSwitchOn("experimental_transfer_probe");
     }
 
     /**
      * 手动指认是否可用：只受 menu_mapping 开关约束（实验性，默认关闭）。
+     * 读不到配置时按<b>关闭</b>处理，理由同 {@link #isProbeAvailable()}。
      */
     public static boolean isMappingAvailable() {
-        return OutputSlotExtractor.isContainerEnabled("menu_mapping");
+        return OutputSlotExtractor.isExperimentalSwitchOn("menu_mapping");
     }
 
     /** 重新向客户端同步模式与"主动探测是否可用"（配置改完后由 /br reload 调用）。 */

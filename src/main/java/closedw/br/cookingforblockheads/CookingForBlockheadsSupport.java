@@ -26,11 +26,6 @@ public final class CookingForBlockheadsSupport {
 
     private static final String CONFIG_CLASS = "net.blay09.mods.cookingforblockheads.CookingForBlockheadsConfig";
 
-    private static final int[] INPUT_SLOTS = { 0, 1, 2 };
-    private static final int[] FUEL_SLOTS = { 3 };
-    private static final int[] OUTPUT_SLOTS = { 4, 5, 6 };
-    private static final int[] ALL_SLOTS = { 0, 1, 2, 3, 4, 5, 6 };
-
     private static final boolean LOADED = checkLoaded();
 
     private static boolean checkLoaded() {
@@ -99,21 +94,5 @@ public final class CookingForBlockheadsSupport {
         catch (Throwable t) {
             return null;
         }
-    }
-
-    public static int[] getInputSlots() {
-        return INPUT_SLOTS;
-    }
-
-    public static int[] getFuelSlots() {
-        return FUEL_SLOTS;
-    }
-
-    public static int[] getOutputSlots() {
-        return OUTPUT_SLOTS;
-    }
-
-    public static int[] getAllSlots() {
-        return ALL_SLOTS;
     }
 }

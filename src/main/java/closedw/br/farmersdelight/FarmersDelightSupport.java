@@ -19,8 +19,6 @@ public final class FarmersDelightSupport {
 
     private static final String COOKING_POT_CLASS = "vectorwing.farmersdelight.common.block.entity.CookingPotBlockEntity";
 
-    private static final String BASKET_CLASS = "vectorwing.farmersdelight.common.block.entity.BasketBlockEntity";
-
     private static final boolean LOADED = checkLoaded();
 
     private static boolean checkLoaded() {
@@ -42,19 +40,6 @@ public final class FarmersDelightSupport {
         }
         try {
             Class<?> clazz = Class.forName(COOKING_POT_CLASS);
-            return clazz.isInstance(blockEntity);
-        }
-        catch (Throwable t) {
-            return false;
-        }
-    }
-
-    public static boolean isBasket(BlockEntity blockEntity) {
-        if (!LOADED || blockEntity == null) {
-            return false;
-        }
-        try {
-            Class<?> clazz = Class.forName(BASKET_CLASS);
             return clazz.isInstance(blockEntity);
         }
         catch (Throwable t) {

@@ -51,7 +51,7 @@ public final class OutputSlotExtractor {
     }
 
     /**
-     * 查询某个容器是否启用。未安装Configured时默认全部启用
+     * 查询某个容器是否启用。
      */
     public static boolean isContainerEnabled(String key) {
         try {
@@ -63,7 +63,7 @@ public final class OutputSlotExtractor {
     }
 
     /**
-     * 查询整数配置。未安装Configured时返回fallback。
+     * 查询整数配置。读不到时返回 fallback。
      */
     public static int getConfigInt(String key, int fallback) {
         try {
@@ -71,6 +71,22 @@ public final class OutputSlotExtractor {
         }
         catch (LinkageError e) {
             return fallback;
+        }
+    }
+
+    /**
+     * 查询一个"默认关闭"的实验性开关（{@code menu_mapping} / {@code experimental_transfer_probe}）。
+     * <p>
+     * 与 {@link #isContainerEnabled} 刻意相反：读不到配置时返回 <b>false</b>。
+     * 容器开关缺失配置时按"开启"处理（宁可照旧也不要静默失效），但实验性功能必须相反——
+     * 缺配置就当没开，否则它会绕过"默认关闭"的约定自己冒出来。
+     */
+    public static boolean isExperimentalSwitchOn(String key) {
+        try {
+            return BetterRemovalConfig.get().isEnabled(key);
+        }
+        catch (LinkageError e) {
+            return false;
         }
     }
 
@@ -98,12 +114,12 @@ public final class OutputSlotExtractor {
     // FTB Ultimine 连锁
     /**
      * FTB Ultimine连锁（取出/放入共用）的容器位置列表。
-     * 条件：配置开启 + 按住Ultimine键 + Ultimine存在缓存的连锁形状。
+     * 条件：配置开启 + 官方 API 能拿到连锁选区（拿不到即"没按住 Ultimine 键或形状无效"）。
      * 点击的容器保证在列表中；数量受ftb_ultimine_max_containers限制。
      * 返回null表示不适用连锁。
      */
     public static List<BlockPos> getChainPositions(Player player, BlockPos clicked) {
-        if (!isContainerEnabled("ftb_ultimine") || !FTBUltimineSupport.isKeyHeld(player)) {
+        if (!isContainerEnabled("ftb_ultimine")) {
             return null;
         }
         java.util.Collection<BlockPos> shape = FTBUltimineSupport.getShapePositions(player);
@@ -845,6 +861,9 @@ public final class OutputSlotExtractor {
                 continue;
             }
             if (insertIntoPlayerInventory(player, portion) <= 0) {
+                // 取出的数量已经按 room 限制过，正常到不了这里；
+                // 真到了（例如模组的 mayPickup 钩子动了背包）也绝不静默吞物品：丢在玩家脚下
+                player.drop(portion, false);
                 continue;
             }
             takenAny = true;

@@ -1,5 +1,6 @@
 package closedw.br.client;
 
+import closedw.br.BetterRemoval;
 import closedw.br.BetterRemovalClient;
 import closedw.br.behavior.Behavior;
 import closedw.br.behavior.InteractionModeManager;
@@ -20,6 +21,7 @@ import net.minecraft.world.inventory.Slot;
 import net.neoforged.neoforge.client.event.ContainerScreenEvent;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
+import org.slf4j.Logger;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -57,6 +59,8 @@ import java.util.Set;
  */
 public final class MappingSession {
 
+    private static final Logger LOGGER = BetterRemoval.LOGGER;
+
     /** 角色色：输入=绿、燃料=金、输出=青（用作区域底色/边框/标签胶囊的基色）。 */
     private static final int COLOR_INPUT = 0xFF55FF55;
     private static final int COLOR_FUEL = 0xFFFFAA00;
@@ -93,8 +97,15 @@ public final class MappingSession {
 
     /** 按住修饰键时记录下来的槽位（菜单索引）；-1 表示当前没有记录。 */
     private static int recordedSlot = -1;
-    /** 上一帧会话是否已经激活：用来在会话开始时清掉上一次的记录，避免高亮到别的容器上。 */
-    private static boolean sessionWasActive;
+    /**
+     * 本次指认会话所属的那一个界面。
+     * <p>
+     * 叠层与滚轮都只对这个界面生效——否则会话还活着时打开玩家背包（或任何别的容器界面），
+     * 标签就会画到不相干的界面上（两者的菜单槽位号根本不是一套）。
+     * 判据是服务端下发的 {@code menuSize}（见 {@link #bindScreen}）；
+     * 会话结束时会由收包处把它清空（见 {@link #onSessionEnded()}），不依赖渲染钩子。
+     */
+    private static volatile AbstractContainerScreen<?> sessionScreen;
     /** 滚轮选中的画笔角色；悬停到槽位就涂上它。{@code null} = 还没选，此时悬停不改动任何东西。 */
     private static SlotRole brush;
     /** 画笔停顿判定：当前停住的槽位与停住时刻。 */
@@ -127,6 +138,10 @@ public final class MappingSession {
             return false;
         }
         if (!(event.getScreen() instanceof AbstractContainerScreen<?> screen)) {
+            return false;
+        }
+        if (!bindScreen(screen)) {
+            // 会话还开着，但玩家打开的是别的界面（玩家背包等）：不响应、也不消费滚动
             return false;
         }
         // 鼠标得在界面范围内：这样"在界面里滚轮就换画笔和光标"，又不会抢 JEI 物品栏那种界面外的滚动
@@ -243,6 +258,36 @@ public final class MappingSession {
     }
 
     /**
+     * 把叠层与滚轮绑定到"会话所属的那个界面"；不匹配返回 false。
+     *
+     */
+    private static boolean bindScreen(AbstractContainerScreen<?> screen) {
+        if (screen == null) {
+            return false;
+        }
+        int expected = MappingSessionState.getMenuSize();
+        if (expected <= 0 || screen.getMenu().slots.size() != expected) {
+            return false;
+        }
+        if (sessionScreen == screen) {
+            return true;
+        }
+        LOGGER.info("[mapping] {} {} (menuSize={})",
+                sessionScreen == null ? "session bound to" : "rebound to",
+                screen.getClass().getSimpleName(), expected);
+        sessionScreen = screen;
+        resetSessionState();
+        return true;
+    }
+
+    /**
+     * 会话结束：丢掉绑定的界面引用。
+     */
+    public static void onSessionEnded() {
+        sessionScreen = null;
+    }
+
+    /**
      * 取"记录中的槽位"：按住修饰键时把鼠标悬停的槽位记下来。
      * 悬停移开（比如划到 GUI 外面、JEI 列表上）仍沿用最后一次记录，
      * 所以滚轮不要求鼠标一直精准停在那个槽位上。
@@ -300,17 +345,18 @@ public final class MappingSession {
     public static void renderForeground(ContainerScreenEvent.Render.Foreground event) {
         if (!active()) {
             // 会话结束就清掉记录，免得下一次会话的高亮落到别的容器的槽位上
-            sessionWasActive = false;
+            sessionScreen = null;
             resetSessionState();
             // 顺带把换掉的系统光标还回去（真正的兜底在 ScreenEvent.Closing）
             MappingCursors.restore();
             return;
         }
-        if (!sessionWasActive) {
-            sessionWasActive = true;
-            resetSessionState();
-        }
         AbstractContainerScreen<?> screen = event.getContainerScreen();
+        if (!bindScreen(screen)) {
+            // 会话还开着，但渲染的不是会话所属的那个界面（窗口切换那一两帧、end 包未到的窗口期）：
+            // 一律不画，否则会按旧会话的槽位号把标签画到不相干的界面上
+            return;
+        }
         GuiGraphics graphics = event.getGuiGraphics();
         Font font = Minecraft.getInstance().font;
 
@@ -318,12 +364,6 @@ public final class MappingSession {
         updateRecordedSlot(screen);
         applyBrushOnDwell();
 
-        // 坐标系注意：Render.Foreground 是在 AbstractContainerScreen#render 里
-        //   pushPose() → translate(guiLeft, guiTop) → 槽位渲染 → 事件 → popPose()
-        // 之间触发的（1.21.1 反编译源 AbstractContainerScreen.java:142-159-191），
-        // 所以这里画的必须是「GUI 内部坐标」，和 Slot.x / Slot.y 同一套。
-        // 再加一次 getGuiLeft()/getGuiTop() 会让整层标签被平移两次，
-        // 偏移量正好是界面的位置——表现出来就是标签跑到界面右侧 JEI 物品栏那一带。
         AbstractContainerMenu menu = screen.getMenu();
 
         // 1) 相邻同角色槽位合并成区域：逐格铺底色、只描"没有同角色邻居"的边，非矩形形状也能贴合

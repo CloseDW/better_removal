@@ -21,6 +21,14 @@ public final class MappingSessionState {
     private static volatile boolean ok = true;
     private static volatile String message = "";
     private static volatile String match = "";
+    /**
+     * 本会话所属容器的菜单槽位总数（会话已结束时为 0）。
+     * <p>
+     * 这是客户端判断"当前打开的界面是不是这次会话所属的那一个"的<b>唯一判据</b>——
+     * 槽位数对不上（例如玩家背包）就一律不画叠层、不响应滚轮，
+     * 否则两套菜单槽位号会互相污染。见 {@code client/MappingSession#bindScreen}。
+     */
+    private static volatile int menuSize;
     /** 菜单槽位索引 → 角色 */
     private static volatile Map<Integer, SlotRole> roles = Map.of();
 
@@ -38,6 +46,7 @@ public final class MappingSessionState {
         match = payload.match() == null ? "" : payload.match();
         ok = payload.ok();
         message = payload.message() == null ? "" : payload.message();
+        menuSize = Math.max(0, payload.menuSize());
         Map<Integer, SlotRole> next = new LinkedHashMap<>();
         List<MappingFeedbackPayload.RoleEntry> entries = payload.roles();
         if (entries != null) {
@@ -70,6 +79,7 @@ public final class MappingSessionState {
         ok = true;
         message = "";
         match = "";
+        menuSize = 0;
         roles = Map.of();
     }
 
@@ -87,6 +97,11 @@ public final class MappingSessionState {
 
     public static String getMatch() {
         return match;
+    }
+
+    /** 本会话所属容器的菜单槽位总数；会话已结束时为 0。 */
+    public static int getMenuSize() {
+        return menuSize;
     }
 
     public static Map<Integer, SlotRole> getRoles() {

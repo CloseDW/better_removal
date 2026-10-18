@@ -20,9 +20,14 @@ import java.util.List;
  * @param ok      本次改动是否被接受
  * @param message 结果文案的翻译键（{@code betterremoval.mapping.*}）
  * @param match   该容器的匹配串，用于界面标题显示
+ * @param menuSize 该容器菜单的槽位总数（会话已结束时为 0）。
+ *                 客户端用它判断"当前打开的界面是不是这次会话所属的那一个"——
+ *                 槽位数对不上（例如玩家背包）就一律不画叠层、不响应滚轮。
+ *                 <b>字段顺序必须与 Fabric 两端的 {@code MappingFeedbackS2CPacket} 一致</b>
+ *                 （active, ok, message, match, menuSize, roles）。
  * @param roles   菜单槽位索引 → 角色
  */
-public record MappingFeedbackPayload(boolean active, boolean ok, String message, String match,
+public record MappingFeedbackPayload(boolean active, boolean ok, String message, String match, int menuSize,
         List<RoleEntry> roles) implements CustomPacketPayload {
 
     /** 一个已指认的槽位。 */
@@ -39,12 +44,13 @@ public record MappingFeedbackPayload(boolean active, boolean ok, String message,
             boolean ok = buf.readBoolean();
             String message = buf.readUtf();
             String match = buf.readUtf();
+            int menuSize = buf.readVarInt();
             int size = buf.readVarInt();
             List<RoleEntry> roles = new ArrayList<>(Math.max(0, size));
             for (int i = 0; i < size; i++) {
                 roles.add(new RoleEntry(buf.readVarInt(), buf.readEnum(SlotRole.class)));
             }
-            return new MappingFeedbackPayload(active, ok, message, match, List.copyOf(roles));
+            return new MappingFeedbackPayload(active, ok, message, match, menuSize, List.copyOf(roles));
         }
 
         @Override
@@ -53,6 +59,7 @@ public record MappingFeedbackPayload(boolean active, boolean ok, String message,
             buf.writeBoolean(value.ok());
             buf.writeUtf(value.message() == null ? "" : value.message());
             buf.writeUtf(value.match() == null ? "" : value.match());
+            buf.writeVarInt(value.active() ? value.menuSize() : 0);
             List<RoleEntry> roles = value.roles() == null ? List.of() : value.roles();
             buf.writeVarInt(roles.size());
             for (RoleEntry entry : roles) {

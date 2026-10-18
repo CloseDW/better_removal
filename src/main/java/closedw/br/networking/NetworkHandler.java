@@ -2,6 +2,7 @@ package closedw.br.networking;
 
 import closedw.br.behavior.InteractionMode;
 import closedw.br.behavior.InteractionModeManager;
+import closedw.br.client.MappingSession;
 import closedw.br.mapping.MappingSessionManager;
 import closedw.br.mapping.MappingSessionState;
 import net.minecraft.server.level.ServerPlayer;
@@ -53,7 +54,13 @@ public final class NetworkHandler {
         });
 
         registrar.playToClient(MappingFeedbackPayload.TYPE, MappingFeedbackPayload.CODEC, (payload, context) -> {
-            context.enqueueWork(() -> MappingSessionState.update(payload));
+            context.enqueueWork(() -> {
+                MappingSessionState.update(payload);
+                if (!payload.active()) {
+                    // 会话结束：必须在这里丢掉绑定的界面引用。
+                    MappingSession.onSessionEnded();
+                }
+            });
         });
     }
 }

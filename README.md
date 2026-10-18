@@ -68,10 +68,12 @@ numbers are meaningless there — but their **GUI menu** can always reach the sl
 1. Pick **Manual Mapping** on the mode wheel (hold the mode key and scroll).
 2. Hold the modifier and right-click the container: this time the GUI **opens normally** (nothing is
    moved or blocked).
-3. The wheel switches brushes in the order **Input → Output → Fuel → Ignore** (scrolling down moves
-   one step forward; the first scroll selects *Input* to start with). Hold the modifier and **sweep
-   the mouse over / rest it on a slot** (about 0.1 s) to paint the current brush onto it. Coloured
-   regions with a small corner letter (I / F / O) show what each slot is tagged as.
+3. **Hold the modifier** and scroll to switch brushes, in the order **Input → Output → Fuel →
+   Ignore** (scrolling down moves one step forward; the first scroll selects *Input* to start with).
+   Still holding the modifier, **sweep the mouse over / rest it on a slot** (about 0.1 s) to paint the
+   current brush onto it. Coloured regions with a small corner letter (I / F / O) show what each slot
+   is tagged as. **Releasing the modifier stops both scrolling and painting** — the modifier is the
+   master switch for every tagging action.
 4. Close the GUI. The mapping is saved to `config/better-removal/menu-maps.json` on the server.
 
 From then on the container behaves like the built-in ones: extract / deposit / restock without its

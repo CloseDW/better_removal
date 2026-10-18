@@ -202,13 +202,13 @@ public final class MappingSessionManager {
         if (SESSIONS.remove(player.getUUID()) == null) {
             return;
         }
-        safeSend(player, new MappingFeedbackPayload(false, true, "", "", List.of()));
+        safeSend(player, new MappingFeedbackPayload(false, true, "", "", 0, List.of()));
     }
 
     private static void reject(ServerPlayer player, Session session, String messageKey) {
         if (session == null) {
             message(player, messageKey);
-            safeSend(player, new MappingFeedbackPayload(false, false, messageKey, "", List.of()));
+            safeSend(player, new MappingFeedbackPayload(false, false, messageKey, "", 0, List.of()));
             return;
         }
         sendFeedback(player, session, false, messageKey);
@@ -217,7 +217,8 @@ public final class MappingSessionManager {
     private static void sendFeedback(ServerPlayer player, Session session, boolean ok, String messageKey) {
         List<MappingFeedbackPayload.RoleEntry> entries = new ArrayList<>();
         session.roles.forEach((slot, role) -> entries.add(new MappingFeedbackPayload.RoleEntry(slot, role)));
-        safeSend(player, new MappingFeedbackPayload(true, ok, messageKey, session.match, entries));
+        // menuSize 必须下发：客户端靠它判断"当前界面是不是本会话所属"（槽位数对不上就一律不画叠层）
+        safeSend(player, new MappingFeedbackPayload(true, ok, messageKey, session.match, session.menuSize, entries));
     }
 
     private static void safeSend(ServerPlayer player, MappingFeedbackPayload payload) {

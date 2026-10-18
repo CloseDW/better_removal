@@ -64,15 +64,15 @@ public final class SlotDetection {
         }
         int[] slots;
         switch (mode) {
-            case OUTPUT -> slots = ruleSlots(blockEntity, rule, Set.of(SlotRole.OUTPUT));
-            case INPUT -> slots = ruleSlots(blockEntity, rule, Set.of(SlotRole.INPUT));
-            case FUEL -> slots = ruleSlots(blockEntity, rule, Set.of(SlotRole.FUEL));
+            case OUTPUT -> slots = ruleSlots(blockEntity, rule, RuleDirection.EXTRACT, Set.of(SlotRole.OUTPUT));
+            case INPUT -> slots = ruleSlots(blockEntity, rule, RuleDirection.EXTRACT, Set.of(SlotRole.INPUT));
+            case FUEL -> slots = ruleSlots(blockEntity, rule, RuleDirection.EXTRACT, Set.of(SlotRole.FUEL));
             // ALL = 输入 ∪ 燃料 ∪ 输出（忽略项与未声明项都不算）
             // 先各自求值再合并，不依赖方法实参的求值顺序
             case ALL -> {
-                int[] inputs = ruleSlots(blockEntity, rule, Set.of(SlotRole.INPUT));
-                int[] fuels = ruleSlots(blockEntity, rule, Set.of(SlotRole.FUEL));
-                int[] outputs = ruleSlots(blockEntity, rule, Set.of(SlotRole.OUTPUT));
+                int[] inputs = ruleSlots(blockEntity, rule, RuleDirection.EXTRACT, Set.of(SlotRole.INPUT));
+                int[] fuels = ruleSlots(blockEntity, rule, RuleDirection.EXTRACT, Set.of(SlotRole.FUEL));
+                int[] outputs = ruleSlots(blockEntity, rule, RuleDirection.EXTRACT, Set.of(SlotRole.OUTPUT));
                 slots = union(inputs, fuels, outputs);
             }
             default -> slots = new int[0];
@@ -81,7 +81,9 @@ public final class SlotDetection {
         return slots.length == 0 ? null : slots;
     }
 
-    /** 按声明式规则取「放入」方向的槽位；规格与 {@link #getRuleSlotsForMode} 一致。 */
+    /**
+     * 按声明式规则取「放入」方向的槽位；规格与 {@link #getRuleSlotsForMode} 一致。
+     */
     public static int[] getRuleDepositSlots(BlockEntity blockEntity, SlotSet mode) {
         if (mode != SlotSet.INPUT && mode != SlotSet.FUEL) {
             return null;
@@ -94,7 +96,7 @@ public final class SlotDetection {
             return null;
         }
         Set<SlotRole> wanted = mode == SlotSet.INPUT ? Set.of(SlotRole.INPUT) : Set.of(SlotRole.FUEL);
-        int[] slots = ruleSlots(blockEntity, rule, wanted);
+        int[] slots = ruleSlots(blockEntity, rule, RuleDirection.DEPOSIT, wanted);
         return slots.length == 0 ? null : slots;
     }
 
@@ -129,8 +131,8 @@ public final class SlotDetection {
         return false;
     }
 
-    private static int[] ruleSlots(BlockEntity blockEntity, SlotRule rule, Set<SlotRole> wanted) {
-        return SlotRuleRegistry.slotsFor(blockEntity, rule, RuleDirection.EXTRACT, wanted);
+    private static int[] ruleSlots(BlockEntity blockEntity, SlotRule rule, RuleDirection direction, Set<SlotRole> wanted) {
+        return SlotRuleRegistry.slotsFor(blockEntity, rule, direction, wanted);
     }
 
     /** 合并多个槽位号（有序去重）。 */

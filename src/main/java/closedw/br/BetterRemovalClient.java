@@ -77,9 +77,13 @@ public class BetterRemovalClient {
             }
         }
 
-        // 左Alt修饰键：按下状态始终同步到服务端
+        // 左Alt修饰键：按下状态始终同步到服务端。
+        // 必须用"物理按下"判定：原版 KeyboardHandler#keyPress 里三处 KeyMapping.set 与
+        // KeyMapping.click 全都在 `screen == null` 分支内（1.20.1 Forge 反汇编实证），
+        // 所以开着容器界面时 isDown() 一直停在"打开界面那一刻"的值，服务端收不到 GUI 内的按/松。
+        // GUI 内部的判定本来就用 isExtractKeyPhysicallyDown()，这里与它统一。
         if (extractKey != null) {
-            boolean pressed = extractKey.isDown();
+            boolean pressed = isExtractKeyPhysicallyDown();
             if (pressed != extractLastPressed) {
                 extractLastPressed = pressed;
                 PacketDistributor.sendToServer(new ExtractKeyStatePayload(pressed));
@@ -134,12 +138,9 @@ public class BetterRemovalClient {
 
     /**
      * 修饰键是否处于按下状态（供 Jade 预览判断左Alt）。
-     * 注意：这个值来自 {@link KeyMapping}，而原版在<b>有界面打开时不会</b>把新按下的键写进 KeyMapping
-     * （KeyboardHandler 只在 {@code screen == null} 时 {@code KeyMapping.set(..., true)}），
-     * 所以在 GUI 里判断修饰键必须用 {@link #isExtractKeyPhysicallyDown()}。
      */
     public static boolean isExtractKeyPressed() {
-        return extractKey != null && extractKey.isDown();
+        return isExtractKeyPhysicallyDown();
     }
 
     /**
