@@ -42,3 +42,10 @@ hs_err_*.log
 replay_*.log
 *.hprof
 *.jfr
+
+### 文档：只上传 README，其它 md 一律留在本地 ###
+# 例如 docs/ARCHITECTURE.zh_cn.md（开发/维护说明）——放本地看，不进仓库、不随发行版发布。
+# 想临时提交某个 md：git add -f <文件>
+*.md
+!README.md
+!README.*.md
