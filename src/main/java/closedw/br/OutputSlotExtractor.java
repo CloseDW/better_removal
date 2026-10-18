@@ -426,17 +426,25 @@ public final class OutputSlotExtractor {
 		}
 	}
 
+	/**
+	 * 单容器放入：把 {@code held} 按权重（槽位剩余容量）均分到映射声明的槽位。
+	 * <p>
+	 * <b>与连锁放入共用 {@link #depositWeighted}</b>。曾经这里是贪心的——一口气把第一格灌满再轮到下一格，
+	 * 于是"手动指认了 5 个输入槽，64 个物品全进了第一格"。贪心还对槽位顺序敏感
+	 * （刚指认完是内存顺序、重启后是 json 里的顺序），表现就是"同一个容器重启前后不一样"。
+	 */
 	private static boolean depositToContainer(ContainerAccess access, int[] slots, ItemStack held) {
-		boolean movedAny = false;
+		if (access == null || slots == null || slots.length == 0 || held.isEmpty()) {
+			return false;
+		}
+		List<DepositSlot> targets = new ArrayList<>();
 		for (int slot : slots) {
-			if (held.isEmpty()) {
-				break;
-			}
-			if (depositToContainerSlot(access, slot, held, Integer.MAX_VALUE) > 0) {
-				movedAny = true;
+			int weight = slotFreeCapacity(access, slot, held);
+			if (weight > 0) {
+				targets.add(new DepositSlot(access, slot, weight));
 			}
 		}
-		return movedAny;
+		return depositWeighted(targets, held);
 	}
 
 	/**
@@ -492,39 +500,7 @@ public final class OutputSlotExtractor {
 		}
 
 		// 按权重比例分配手持物品（权重=槽位剩余容量）
-		long totalWeight = 0;
-		for (DepositSlot s : slots) {
-			totalWeight += s.weight();
-		}
-		int remaining = held.getCount();
-		int[] share = new int[slots.size()];
-		long allocated = 0;
-		for (int i = 0; i < slots.size(); i++) {
-			share[i] = (int) ((long) remaining * slots.get(i).weight() / totalWeight);
-			allocated += share[i];
-		}
-		// 余数在"还有空间"的槽位之间轮流补，而不是全塞给同一个槽
-		int[] capacity = new int[slots.size()];
-		for (int i = 0; i < slots.size(); i++) {
-			capacity[i] = slots.get(i).weight();
-		}
-		spreadLeftover(share, capacity, remaining - (int) allocated);
-
-		// 第二遍：按份额放入，实际放入少于份额的余量留在手上
-		boolean any = false;
-		for (int i = 0; i < slots.size(); i++) {
-			if (held.isEmpty()) {
-				break;
-			}
-			if (share[i] <= 0) {
-				continue;
-			}
-			DepositSlot s = slots.get(i);
-			if (depositToContainerSlot(s.access(), s.slot(), held, share[i]) > 0) {
-				any = true;
-			}
-		}
-		if (!any) {
+		if (!depositWeighted(slots, held)) {
 			return ActionResult.PASS;
 		}
 		for (ContainerAccess access : dirty) {
@@ -538,6 +514,58 @@ public final class OutputSlotExtractor {
 
 	/** 连锁放入的可接收槽位（权重=槽位剩余容量） */
 	private record DepositSlot(ContainerAccess access, int slot, int weight) {
+	}
+	/**
+	 * 按权重（槽位剩余容量）把 {@code held} 均分到给定槽位；放不下的余量留在手上。
+	 * <p>
+	 * <b>单容器放入与连锁放入共用这一个实现。</b>两者各写一套就会出现"连锁是均分的、
+	 * 单容器却是贪心灌满第一格"这种不一致——实测表现是"手动指认了 5 个输入槽，
+	 * 64 个物品全进了映射里的第一格"。贪心还对槽位顺序敏感（刚指认完是内存顺序、
+	 * 重启后是 json 里的顺序），所以会出现"同一个容器重启前后表现不一样"。
+	 * <p>
+	 * 余数由 {@link #spreadLeftover} 在还有空间的槽位之间轮流补——旧写法反复挑"权重最大"的槽，
+	 * 权重相同时会一直命中同一个，导致映射里第一格总比其它格多。
+	 *
+	 * @return 是否真的放入了至少一件
+	 */
+	private static boolean depositWeighted(List<DepositSlot> targets, ItemStack held) {
+		if (targets == null || targets.isEmpty() || held.isEmpty()) {
+			return false;
+		}
+		long totalWeight = 0;
+		for (DepositSlot s : targets) {
+			totalWeight += s.weight();
+		}
+		if (totalWeight <= 0) {
+			return false;
+		}
+		int remaining = held.getCount();
+		int[] share = new int[targets.size()];
+		int[] capacity = new int[targets.size()];
+		long allocated = 0;
+		for (int i = 0; i < targets.size(); i++) {
+			capacity[i] = targets.get(i).weight();
+			share[i] = (int) ((long) remaining * capacity[i] / totalWeight);
+			allocated += share[i];
+		}
+		// 余数在"还有空间"的槽位之间轮流补，而不是全塞给同一个槽
+		spreadLeftover(share, capacity, remaining - (int) allocated);
+
+		// 按份额放入；实际放入少于份额的余量留在手上
+		boolean any = false;
+		for (int i = 0; i < targets.size(); i++) {
+			if (held.isEmpty()) {
+				break;
+			}
+			if (share[i] <= 0) {
+				continue;
+			}
+			DepositSlot s = targets.get(i);
+			if (depositToContainerSlot(s.access(), s.slot(), held, share[i]) > 0) {
+				any = true;
+			}
+		}
+		return any;
 	}
 
 	/** 槽位剩余可放容量（权重）。空槽=手持堆叠上限；同类=剩余空间；其它=0 */
