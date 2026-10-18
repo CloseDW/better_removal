@@ -78,7 +78,7 @@ public final class ContainerRegistry {
 			return BetterRemovalConfig.DEFAULT_VALUES.containsKey(key);
 		}
 		catch (Throwable t) {
-			// 未安装 Configured，或配置还没初始化：无法检查，别误报
+			// 配置类还没初始化完：无法检查，别误报（Configured 本身是必需依赖，不会缺席）
 			return true;
 		}
 	}

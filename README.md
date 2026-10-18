@@ -17,7 +17,7 @@ out of it — **without opening its GUI**.
 
 Deposits respect the container's own slot filters (a furnace's fuel slot only accepts fuel).
 
-**Dependency**: Configured is required; Jade is optional (tooltip preview).
+**Dependency**: Configured 2.2+ is required; Jade is optional (tooltip preview).
 
 | Command | Effect |
 |---|---|
@@ -68,10 +68,12 @@ numbers are meaningless there — but their **GUI menu** can always reach the sl
 1. Pick **Manual Mapping** on the mode wheel (hold the mode key and scroll).
 2. Hold the modifier and right-click the container: this time the GUI **opens normally** (nothing is
    moved or blocked).
-3. The wheel switches brushes in the order **Input → Output → Fuel → Ignore** (scrolling down moves
-   one step forward; the first scroll selects *Input* to start with). Hold the modifier and **sweep
-   the mouse over / rest it on a slot** (about 0.1 s) to paint the current brush onto it. Coloured
-   regions with a small corner letter (I / F / O) show what each slot is tagged as.
+3. **Hold the modifier** and scroll to switch brushes, in the order **Input → Output → Fuel →
+   Ignore** (scrolling down moves one step forward; the first scroll selects *Input* to start with).
+   Still holding the modifier, **sweep the mouse over / rest it on a slot** (about 0.1 s) to paint the
+   current brush onto it. Coloured regions with a small corner letter (I / F / O) show what each slot
+   is tagged as. **Releasing the modifier stops both scrolling and painting** — the modifier is the
+   master switch for every tagging action.
 4. Close the GUI. The mapping is saved to `config/better-removal/menu-maps.json` on the server.
 
 From then on the container behaves like the built-in ones: extract / deposit / restock without its
@@ -141,7 +143,7 @@ Used for built-in compatibility and mod self-declaration, as `better-removal/con
 | `group` | no | Switch group; inferred from the `match` namespace, and **required** when `match` only uses `@class` |
 | `default` | no | Default value of that switch (defaults to `true`) |
 | `size` | no | Total slot count; enables out-of-range checks at startup and mismatch warnings at runtime |
-| `sided` | no | `true` to also require `canExtract` before extracting |
+| `sided` | no | `true` to also require `canTakeItemThroughFace` before extracting |
 
 > Only rules with a `config` key show up in Configured, and only those can be turned off.
 
@@ -155,11 +157,9 @@ slots at all.
 
 With **Active probe mode** enabled (off by default) the mode wheel gains an *Active Probe* entry:
 hold the modifier and right-click any container and the mod asks its own inventory interface
-(`Inventory#isValid` / `SidedInventory#canExtract`), printing one click-to-copy rule
+(`Inventory.isValid` / `SidedInventory.canExtract`), printing one click-to-copy rule
 string you can paste into Configured's *Declared container slot rules*. Probing only prints text and
 never takes over a container.
-(The `[container] <block> -> 0=INPUT 1=FUEL 2=OUTPUT ...` line in the log comes from a **declared
-rule** being applied; probing itself does not log anything.)
 
 It only covers containers that implement vanilla `Inventory` - slot numbers mean nothing otherwise.
 For containers whose GUI has slots but whose block entity does not implement `Inventory`

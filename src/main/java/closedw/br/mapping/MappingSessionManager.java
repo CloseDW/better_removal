@@ -165,6 +165,7 @@ public final class MappingSessionManager {
 			reject(player, session, MenuResolver.ERROR_SIZE_CHANGED);
 			return;
 		}
+
 		if (!MenuResolver.isUsable(menu, player, menuIndex)) {
 			reject(player, session, MenuResolver.ERROR_SLOT_UNUSABLE);
 			return;
@@ -208,7 +209,9 @@ public final class MappingSessionManager {
 		}
 		// 落盘是限流的，会话结束时把攒着的改动补写下去
 		MenuMapStore.flush();
-		if (SESSIONS.remove(player.getUuid()) == null) {
+		// F20 靠 mixin 注入 closeHandledScreen()；如果这条日志在关界面时没出现，就是会话没结束的根因。
+		Session removedSession = SESSIONS.remove(player.getUuid());
+		if (removedSession == null) {
 			return;
 		}
 		safeSend(player, new MappingFeedbackS2CPacket(false, true, "", "", 0, List.of()));

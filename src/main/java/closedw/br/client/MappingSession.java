@@ -39,11 +39,11 @@ import java.util.concurrent.ConcurrentHashMap;
  * 交互（全部在按住修饰键的前提下进行，默认左 Alt、可改键）：
  * <ol>
  *   <li>指认模式下修饰键右击容器 —— 界面照常打开</li>
- *   <li><b>滚轮选"画笔"</b>：输入 → 输出 → 燃料 → 忽略。第一次滚动把画笔设为"输入"，
+ *   <li><b>按住修饰键，滚轮选"画笔"</b>：输入 → 输出 → 燃料 → 忽略。第一次滚动把画笔设为"输入"，
  *       并且立刻涂到当前悬停的槽位上</li>
  *   <li><b>按住修饰键，把鼠标滑过 / 停在槽位上</b>（约 {@link #DWELL_MS} 毫秒）就涂上当前画笔——
  *       这就是"一片一片涂"的方式，不必每格再滚一次</li>
- *   <li>想看不想改：松开修饰键，悬停不会再改动任何东西</li>
+ *   <li>想看不想改：松开修饰键，滚轮与悬停都不会改动任何东西</li>
  * </ol>
  * 画笔没选之前（{@code brush == null}）滑过也不会改动任何东西，避免误擦已有标签。
  * <p>
@@ -140,9 +140,9 @@ public final class MappingSession {
 	/**
 	 * 滚轮换画笔；返回 true 表示这次滚动已被消费。
 	 * <p>
-	 * <b>换画笔不要求按住修饰键</b>：会话本来就是"修饰键 + 右击"开启的，玩家在界面里通常已经松手，
-	 * 而容器界面里的滚轮本来也没有别的用途。真正<b>涂色</b>仍然要求按住修饰键（见 {@link #applyBrushOnDwell}），
-	 * 这样鼠标扫过不会误涂。
+	 * <b>必须按住修饰键</b>：修饰键是"指认操作"的总开关——换画笔与涂色都只在按住它时生效，
+	 * 松开修饰键后滚轮完全不响应（连"滚一下切到输入"也不做）。这是有意的设计：
+	 * 会话期间玩家可能松手去看/去点别的东西，此时滚轮不该改动任何状态。
 	 *
 	 * @param mouseX / mouseY 缩放后的屏幕坐标（与渲染回调同一套）
 	 * @param scrollDeltaY   与 NeoForge {@code getScrollDeltaY()} 同义（向上为正）
@@ -156,6 +156,11 @@ public final class MappingSession {
 			return false;
 		}
 		if (screen == null) {
+			return false;
+		}
+		// 修饰键是"指认操作"的总开关：没按住就什么都不做（换画笔也不做）
+		if (!BetterRemovalClient.isExtractKeyPhysicallyDown()) {
+			note("the modifier key is not held");
 			return false;
 		}
 		if (!bindScreen(screen)) {

@@ -46,6 +46,8 @@ import java.util.Set;
  */
 public final class OutputSlotExtractor {
 
+	private static final org.slf4j.Logger LOGGER = BetterRemoval.LOGGER;
+
 	private OutputSlotExtractor() {
 	}
 
@@ -54,7 +56,12 @@ public final class OutputSlotExtractor {
 	}
 
 	/**
-	 * 查询某个容器是否启用。未安装Configured时默认全部启用
+	 * 查询某个容器是否启用。
+	 * <p>
+	 * Configured 是<b>必需</b>依赖（`fabric.mod.json` 的 `depends`，与 NeoForge 端的
+	 * `type="required"` 对齐），所以正常情况下这里不会走到 catch。
+	 * 保留 {@link LinkageError} 兜底只是为了"配置类还没被类加载器解析完"这类极端时序：
+	 * 容器开关读不到时按<b>启用</b>处理（宁可照旧也不要静默失效）。
 	 */
 	public static boolean isContainerEnabled(String key) {
 		try {
@@ -66,7 +73,7 @@ public final class OutputSlotExtractor {
 	}
 
 	/**
-	 * 查询整数配置。未安装Configured时返回fallback。
+	 * 查询整数配置。读不到时返回 fallback。
 	 */
 	public static int getConfigInt(String key, int fallback) {
 		try {
@@ -94,7 +101,8 @@ public final class OutputSlotExtractor {
 	}
 
 	/**
-	 * 查询字符串列表配置（声明式槽位规则 slot_rules）。未安装Configured时返回空列表。
+	 * 查询字符串列表配置（声明式槽位规则 slot_rules）。读不到时返回空列表
+	 * （Configured 是必需依赖，见 {@link #isContainerEnabled} 的说明）。
 	 */
 	public static List<String> getConfigList(String key) {
 		try {
@@ -117,12 +125,12 @@ public final class OutputSlotExtractor {
 	// FTB Ultimine 连锁
 	/**
 	 * FTB Ultimine连锁（取出/放入共用）的容器位置列表。
-	 * 条件：配置开启 + 按住Ultimine键 + Ultimine存在缓存的连锁形状。
+	 * 条件：配置开启 + 官方 API 能拿到连锁选区（拿不到即"没按住 Ultimine 键或形状无效"）。
 	 * 点击的容器保证在列表中；数量受ftb_ultimine_max_containers限制。
 	 * 返回null表示不适用连锁。
 	 */
 	public static List<BlockPos> getChainPositions(PlayerEntity player, BlockPos clicked) {
-		if (!isContainerEnabled("ftb_ultimine") || !FTBUltimineSupport.isKeyHeld(player)) {
+		if (!isContainerEnabled("ftb_ultimine")) {
 			return null;
 		}
 		java.util.Collection<BlockPos> shape = FTBUltimineSupport.getShapePositions(player);
@@ -240,6 +248,12 @@ public final class OutputSlotExtractor {
 		}
 
 		InteractionMode state = InteractionModeManager.getState(player);
+
+		// 只在探测/指认模式记（普通右击不记，避免刷屏）。
+		// 复现时看这一行在不在：在 → 服务端确实以为 Alt 按着（问题在同步链路）；
+		// 不在却仍然探测了 → 触发路径根本不是这道闸（问题在别处）。
+		if (state.behavior() == Behavior.PROBE || state.behavior() == Behavior.MAPPING) {
+		}
 
 		// ---------- 手动指认：不取消交互，让原版照常打开 GUI，玩家在界面里标槽位 ----------
 		if (state.behavior() == Behavior.MAPPING) {
@@ -381,6 +395,37 @@ public final class OutputSlotExtractor {
 	 * 每个槽位都会先经过 isValid 校验。
 	 * @return 是否放入了至少一个物品
 	 */
+	/**
+	 * 把整除后的余数<b>轮流</b>分给"还有空间"的槽位。
+	 * <p>
+	 * 旧写法是反复挑"权重最大"的槽 {@code share[best]++}，而权重相同时比较用的是 {@code >}，
+	 * 于是每次都命中同一个（最先遇到的）槽——表现出来就是"映射里第一格总比其它格补得多"，
+	 * 槽越多、存货越少偏得越明显（5 个槽时最多能差 4 个）。
+	 * <p>
+	 * 这里改成从前往后轮流补，一轮补不完再转一圈，直到余数分完或所有槽都满了。
+	 *
+	 * @param share    各槽已分到的份额（就地修改）
+	 * @param capacity 各槽还能接受的上限（补货 = need，连锁放入 = 剩余容量）
+	 * @param leftover 待分配的余数
+	 */
+	private static void spreadLeftover(int[] share, int[] capacity, int leftover) {
+		if (leftover <= 0 || share == null || capacity == null) {
+			return;
+		}
+		int n = Math.min(share.length, capacity.length);
+		boolean progressed = true;
+		while (leftover > 0 && progressed) {
+			progressed = false;
+			for (int i = 0; i < n && leftover > 0; i++) {
+				if (share[i] < capacity[i]) {
+					share[i]++;
+					leftover--;
+					progressed = true;
+				}
+			}
+		}
+	}
+
 	private static boolean depositToContainer(ContainerAccess access, int[] slots, ItemStack held) {
 		boolean movedAny = false;
 		for (int slot : slots) {
@@ -458,21 +503,12 @@ public final class OutputSlotExtractor {
 			share[i] = (int) ((long) remaining * slots.get(i).weight() / totalWeight);
 			allocated += share[i];
 		}
-		// 余数补足给权重最大且未填满的槽位
-		int leftover = remaining - (int) allocated;
-		while (leftover > 0) {
-			int best = -1;
-			for (int i = 0; i < slots.size(); i++) {
-				if (share[i] < slots.get(i).weight() && (best == -1 || slots.get(i).weight() > slots.get(best).weight())) {
-					best = i;
-				}
-			}
-			if (best == -1) {
-				break;
-			}
-			share[best]++;
-			leftover--;
+		// 余数在"还有空间"的槽位之间轮流补，而不是全塞给同一个槽
+		int[] capacity = new int[slots.size()];
+		for (int i = 0; i < slots.size(); i++) {
+			capacity[i] = slots.get(i).weight();
 		}
+		spreadLeftover(share, capacity, remaining - (int) allocated);
 
 		// 第二遍：按份额放入，实际放入少于份额的余量留在手上
 		boolean any = false;
@@ -643,21 +679,12 @@ public final class OutputSlotExtractor {
 				share[k] = (int) Math.min(group.get(k).need(), (long) stock * group.get(k).need() / totalNeed);
 				allocated += share[k];
 			}
-			// 余数补足给需求最大且未填满的槽位
-			int leftover = stock - (int) allocated;
-			while (leftover > 0) {
-				int best = -1;
-				for (int k = 0; k < group.size(); k++) {
-					if (share[k] < group.get(k).need() && (best == -1 || group.get(k).need() > group.get(best).need())) {
-						best = k;
-					}
-				}
-				if (best == -1) {
-					break;
-				}
-				share[best]++;
-				leftover--;
+			// 余数在"还差得下"的槽位之间轮流补，而不是全塞给同一个槽
+			int[] capacity = new int[group.size()];
+			for (int k = 0; k < group.size(); k++) {
+				capacity[k] = group.get(k).need();
 			}
+			spreadLeftover(share, capacity, stock - (int) allocated);
 			// 应用份额：先模拟确认可放量，再扣背包并放入，避免丢物品
 			for (int k = 0; k < group.size(); k++) {
 				if (share[k] <= 0) {

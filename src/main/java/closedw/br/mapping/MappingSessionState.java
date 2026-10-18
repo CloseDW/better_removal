@@ -1,7 +1,9 @@
 package closedw.br.mapping;
 
+import closedw.br.BetterRemoval;
 import closedw.br.networking.MappingFeedbackS2CPacket;
 import closedw.br.slot.SlotRole;
+import org.slf4j.Logger;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -16,6 +18,8 @@ import java.util.Map;
  * （与 {@code InteractionModeManager#setClientState} 的做法一致）。
  */
 public final class MappingSessionState {
+
+	private static final Logger LOGGER = BetterRemoval.LOGGER;
 
 	private static volatile boolean active;
 	private static volatile boolean ok = true;

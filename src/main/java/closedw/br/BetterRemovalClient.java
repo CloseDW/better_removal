@@ -22,6 +22,7 @@ import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.client.util.Window;
 import org.lwjgl.glfw.GLFW;
+import org.slf4j.Logger;
 
 /**
  * 客户端初始化。
@@ -35,6 +36,8 @@ public class BetterRemovalClient implements ClientModInitializer {
 	public static final String CATEGORY = "key.better-removal.category";
 	public static final String EXTRACT_KEY = "key.better-removal.extract";
 	public static final String MODE_KEY = "key.better-removal.mode";
+
+	private static final Logger LOGGER = BetterRemoval.LOGGER;
 
 	private static KeyBinding extractKey;
 	private static KeyBinding modeKey;
@@ -80,7 +83,9 @@ public class BetterRemovalClient implements ClientModInitializer {
 				ClientPlayNetworking.send(new ExtractKeyStateC2SPacket(true));
 			}
 		});
-		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> extractLastPressed = false);
+		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+			extractLastPressed = false;
+		});
 	}
 
 	/**
