@@ -7,7 +7,9 @@ import closedw.br.OutputSlotExtractor;
 import closedw.br.behavior.Behavior;
 import closedw.br.behavior.InteractionMode;
 import closedw.br.behavior.InteractionModeManager;
+import closedw.br.slot.SlotSet;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -69,14 +71,14 @@ public class ExtractionPreviewProvider implements IBlockComponentProvider {
             return;
         }
 
-        // 放入模式：显示主手物品（无需服务端数据）
+        // 放入模式：显示主手物品（无需服务端数据；但"放不放得进"要按槽位逐一校验）
         if (state.behavior() == Behavior.DEPOSIT) {
             ItemStack held = player.getMainHandItem();
             if (held.isEmpty()) {
                 return;
             }
             // 槽位过滤/容量逐槽校验：全部放不下时不显示预览
-            if (!OutputSlotExtractor.canDepositTo(player, blockEntity, state.slots(), held)) {
+            if (!canDeposit(player, blockEntity, state.slots(), held)) {
                 return;
             }
             addBox(tooltip, Component.translatable("betterremoval.jade.deposit").withStyle(ChatFormatting.GREEN), List.of(held));
@@ -106,6 +108,41 @@ public class ExtractionPreviewProvider implements IBlockComponentProvider {
             return;
         }
         addBox(tooltip, Component.translatable("betterremoval.jade.preview").withStyle(ChatFormatting.GREEN), items);
+    }
+
+    /**
+     * 放入预览的「放得进吗」判定缓存。
+     * <p>
+     * 手动指认的容器（菜单槽位）要判断放不放得进，必须临时构造菜单——工具提示是每帧渲染的，
+     * 每帧建一次菜单太浪费。这里按（方块、槽位模式、手持物）缓存一小段时间：
+     * 手持物一换（滚轮/切换物品）立刻重算，容器内容的变化最多晚 {@link #DEPOSIT_CHECK_TTL_MS} 毫秒反映。
+     */
+    private static final long DEPOSIT_CHECK_TTL_MS = 250L;
+
+    private static BlockPos depositCheckPos;
+    private static SlotSet depositCheckSlots;
+    private static ItemStack depositCheckItem = ItemStack.EMPTY;
+    private static boolean depositCheckResult;
+    private static long depositCheckAt;
+
+    /** 语义同 {@link OutputSlotExtractor#canDepositTo}，只是带一层短时缓存。 */
+    private static boolean canDeposit(Player player, BlockEntity blockEntity, SlotSet slots, ItemStack held) {
+        long now = System.currentTimeMillis();
+        boolean cached = now - depositCheckAt < DEPOSIT_CHECK_TTL_MS
+                && blockEntity.getBlockPos().equals(depositCheckPos)
+                && slots == depositCheckSlots
+                && held.getCount() == depositCheckItem.getCount()
+                && ItemStack.isSameItemSameComponents(held, depositCheckItem);
+        if (cached) {
+            return depositCheckResult;
+        }
+        boolean result = OutputSlotExtractor.canDepositTo(player, blockEntity, slots, held);
+        depositCheckPos = blockEntity.getBlockPos();
+        depositCheckSlots = slots;
+        depositCheckItem = held.copy();
+        depositCheckResult = result;
+        depositCheckAt = now;
+        return result;
     }
 
     /** 高亮预览行：标签 + 物品图标，外层用彩色边框包裹 */

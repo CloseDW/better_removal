@@ -36,17 +36,15 @@ public final class MenuResolver {
     }
 
     /**
-     * 构造一个临时菜单。失败（不是 MenuProvider、构造抛异常、客户端侧）返回 null。
-     * <p>
+     * 构造一个临时菜单。失败（不是 MenuProvider、构造抛异常）返回 null。
      * containerId 用 0：这个菜单从不注册给玩家，所以它和玩家自己的背包菜单不会冲突。
+     * 客户端也允许构造：Jade 的「放入预览」必须在客户端判断"这个物品放不放得进这些槽位"，
+     * 而菜单槽位（手动指认映射）只有拿到菜单才能问 {@code Slot#mayPlace} 与剩余容量。
+     * 客户端只用它做只读与模拟（{@code insert(..., simulate = true)}），不会真写容器——
+     * 真正的写操作全在服务端（{@code onRightClickBlock} 在客户端第一行就返回了）。
      */
     public static AbstractContainerMenu open(BlockEntity blockEntity, Player player) {
         if (blockEntity == null || player == null) {
-            return null;
-        }
-        Level level = player.level();
-        if (level == null || level.isClientSide) {
-            // 菜单只能在服务端构造
             return null;
         }
         if (!(blockEntity instanceof MenuProvider provider)) {

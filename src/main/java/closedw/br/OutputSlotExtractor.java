@@ -179,8 +179,11 @@ public final class OutputSlotExtractor {
                         continue;
                     }
                     List<ItemStack> part = ExtractionPreviewItems.collect(player, be, mode);
-                    if (part != null && !part.isEmpty()) {
-                        items.addAll(part);
+                    if (part != null) {
+                        // 跨容器也叠起来：两台机器各 32 个同类物品，预览里是一叠 64 而不是两个 32
+                        for (ItemStack stack : part) {
+                            ExtractionPreviewItems.mergeInto(items, stack);
+                        }
                     }
                     // 限制聚合大小，避免向客户端下发过大数据
                     if (items.size() >= 128) {
@@ -547,82 +550,24 @@ public final class OutputSlotExtractor {
         // 修饰键+空手再按住Ultimine键时，对连锁形状内所有容器逐个补货（背包耗尽即止）
         List<BlockPos> chain = getChainPositions(player, pos);
         if (chain != null) {
-            return handleChainRestock(player, level, chain);
+            return restockAcross(player, level, chain);
         }
 
-        ContainerSupport support = ContainerRegistry.find(blockEntity);
-        if (support == null || !support.enabled() || !support.allowInteraction(blockEntity)) {
-            return false;
-        }
-        int[] slots = support.restockSlots(blockEntity);
-        ContainerAccess access = support.access(blockEntity, player);
-        if (slots == null || access == null) {
-            return false;
-        }
-        if (!restockAccess(player, access, slots)) {
-            return false;
-        }
-        access.markDirty();
-        player.getInventory().setChanged();
-        playPickupSound(player, level);
-        return true;
+        // 单容器补货：走与连锁完全相同的那套"按剩余容量分摊"算法。
+        return restockAcross(player, level, List.of(pos));
     }
 
     /**
-     * 补货：从背包向容器指定槽位补充已有同类物品到槽位上限，空槽不补。
-     * @return 是否补充了至少一个物品
-     */
-    private static boolean restockAccess(Player player, ContainerAccess access, int[] slots) {
-        boolean movedAny = false;
-        for (int slot : slots) {
-            ItemStack existing = access.get(slot);
-            if (existing.isEmpty()) {
-                // 空槽不补
-                continue;
-            }
-            int need = existing.getMaxStackSize() - existing.getCount();
-            if (need <= 0) {
-                // 已满
-                continue;
-            }
-            int stock = countInInventory(player, existing);
-            if (stock <= 0) {
-                // 背包没有同类存货
-                continue;
-            }
-            // 单容器补货：需要量与背包存货取小者
-            int want = Math.min(need, stock);
-            // 先模拟放入确认实际可放数量，避免先扣背包后放不进而丢物品
-            ItemStack probe = existing.copy();
-            probe.setCount(want);
-            int canInsert = access.insert(slot, probe, true);
-            if (canInsert <= 0) {
-                continue;
-            }
-            int taken = takeFromPlayerInventory(player, existing, canInsert);
-            if (taken <= 0) {
-                continue;
-            }
-            ItemStack portion = existing.copy();
-            portion.setCount(taken);
-            int put = access.insert(slot, portion, false);
-            if (put < taken) {
-                giveBackToPlayer(player, taken - put, existing);
-            }
-            movedAny = true;
-        }
-        return movedAny;
-    }
-
-    /**
-     * 连锁补货：把背包存货按物品类型分组，组内按权重（槽位剩余容量）分摊到连锁形状内所有补货槽。
+     * 补货：把这些容器里可补的槽位按物品类型分组，组内按权重（槽位剩余容量）分摊背包存货。
      * 剩余越多的槽位补得越多，尽量补满；空槽不补；背包存货耗尽即止。
+     * <p>
+     * 单个容器也走这里（传一个只有它自己的位置表），这样"单容器"和"连锁"的分货行为完全一致：
      */
-    private static boolean handleChainRestock(Player player, Level level, List<BlockPos> chain) {
+    private static boolean restockAcross(Player player, Level level, List<BlockPos> positions) {
         // 第一遍：收集所有可补货的槽位（非空且未满、背包有同类存货）
         List<RestockSlot> slots = new ArrayList<>();
         Set<ContainerAccess> dirty = new LinkedHashSet<>();
-        for (BlockPos pos : chain) {
+        for (BlockPos pos : positions) {
             BlockEntity blockEntity = level.getBlockEntity(pos);
             if (blockEntity == null) {
                 continue;
@@ -837,9 +782,10 @@ public final class OutputSlotExtractor {
             if (toAdd <= 0) {
                 continue;
             }
+            // 同种物品叠起来，而且单叠不超过 64（物品自身的堆叠上限更小时按它算）
             ItemStack display = first.template().copy();
             display.setCount(toAdd);
-            items.add(display);
+            ExtractionPreviewItems.mergeInto(items, display);
         }
         return items;
     }
