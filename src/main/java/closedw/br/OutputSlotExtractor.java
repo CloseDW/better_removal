@@ -383,18 +383,30 @@ public final class OutputSlotExtractor {
      * 每个槽位都会先经过 canPlaceItem 校验。
      * @return 是否放入了至少一个物品
      */
-    private static boolean depositToContainer(ContainerAccess access, int[] slots, ItemStack held) {
-        boolean movedAny = false;
-        for (int slot : slots) {
-            if (held.isEmpty()) {
-                break;
-            }
-            if (depositToContainerSlot(access, slot, held, Integer.MAX_VALUE) > 0) {
-                movedAny = true;
-            }
-        }
-        return movedAny;
-    }
+    	/**
+	 * 把整除后的余数<b>轮流</b>分给"还有空间"的槽位。
+	 * <p>
+	 * 旧写法是反复挑"权重最大"的槽 {@code share[best]++}，而权重相同时比较用的是 {@code >}，
+	 * 于是每次都命中同一个（最先遇到的）槽——表现出来就是"映射里第一格总比其它格多"。
+	 */
+	private static void spreadLeftover(int[] share, int[] capacity, int leftover) {
+		if (leftover <= 0 || share == null || capacity == null) {
+			return;
+		}
+		int n = Math.min(share.length, capacity.length);
+		boolean progressed = true;
+		while (leftover > 0 && progressed) {
+			progressed = false;
+			for (int i = 0; i < n && leftover > 0; i++) {
+				if (share[i] < capacity[i]) {
+					share[i]++;
+					leftover--;
+					progressed = true;
+				}
+			}
+		}
+	}
+	
 
     /**
      * 放入单个槽位，返回实际放入数量。
@@ -449,48 +461,7 @@ public final class OutputSlotExtractor {
         }
 
         // 按权重比例分配手持物品（权重=槽位剩余容量）
-        long totalWeight = 0;
-        for (DepositSlot s : slots) {
-            totalWeight += s.weight();
-        }
-        int remaining = held.getCount();
-        int[] share = new int[slots.size()];
-        long allocated = 0;
-        for (int i = 0; i < slots.size(); i++) {
-            share[i] = (int) ((long) remaining * slots.get(i).weight() / totalWeight);
-            allocated += share[i];
-        }
-        // 余数补足给权重最大且未填满的槽位
-        int leftover = remaining - (int) allocated;
-        while (leftover > 0) {
-            int best = -1;
-            for (int i = 0; i < slots.size(); i++) {
-                if (share[i] < slots.get(i).weight() && (best == -1 || slots.get(i).weight() > slots.get(best).weight())) {
-                    best = i;
-                }
-            }
-            if (best == -1) {
-                break;
-            }
-            share[best]++;
-            leftover--;
-        }
-
-        // 第二遍：按份额放入，实际放入少于份额的余量留在手上
-        boolean any = false;
-        for (int i = 0; i < slots.size(); i++) {
-            if (held.isEmpty()) {
-                break;
-            }
-            if (share[i] <= 0) {
-                continue;
-            }
-            DepositSlot s = slots.get(i);
-            if (depositToContainerSlot(s.access(), s.slot(), held, share[i]) > 0) {
-                any = true;
-            }
-        }
-        if (!any) {
+		if (!depositWeighted(slots, held)) {
             return false;
         }
         for (ContainerAccess access : dirty) {
@@ -505,6 +476,73 @@ public final class OutputSlotExtractor {
     /** 连锁放入的可接收槽位（权重=槽位剩余容量） */
     private record DepositSlot(ContainerAccess access, int slot, int weight) {
     }
+	/**
+	 * 单容器放入：按权重（槽位剩余容量）均分到映射声明的槽位。
+	 * <p>
+	 * 曾经这里是贪心的——一口气把第一格灌满再轮到下一格，于是"手动指认了 5 个输入槽，
+	 * 物品全挤进第一个槽。
+	 */
+	private static boolean depositToContainer(ContainerAccess access, int[] slots, ItemStack held) {
+		if (access == null || slots == null || slots.length == 0 || held.isEmpty()) {
+			return false;
+		}
+		List<DepositSlot> targets = new ArrayList<>();
+		for (int slot : slots) {
+			int weight = slotFreeCapacity(access, slot, held);
+			if (weight > 0) {
+				targets.add(new DepositSlot(access, slot, weight));
+			}
+		}
+		return depositWeighted(targets, held);
+	}
+
+	/**
+	 * 按权重（槽位剩余容量）把 {@code held} 均分到给定槽位；放不下的余量留在手上。
+	 * <p>
+	 * <b>单容器放入与连锁放入共用这一个实现</b>：两者各写一套就会出现"连锁是均分的、
+	 * 单容器却是贪心灌满第一格"这种不一致。
+	 * <p>
+	 * 余数由 {@link #spreadLeftover} 在还有空间的槽位之间轮流补。
+	 *
+	 * @return 是否真的放入了至少一件
+	 */
+	private static boolean depositWeighted(List<DepositSlot> targets, ItemStack held) {
+		if (targets == null || targets.isEmpty() || held.isEmpty()) {
+			return false;
+		}
+		long totalWeight = 0;
+		for (DepositSlot s : targets) {
+			totalWeight += s.weight();
+		}
+		if (totalWeight <= 0) {
+			return false;
+		}
+		int remaining = held.getCount();
+		int[] share = new int[targets.size()];
+		int[] capacity = new int[targets.size()];
+		long allocated = 0;
+		for (int i = 0; i < targets.size(); i++) {
+			capacity[i] = targets.get(i).weight();
+			share[i] = (int) ((long) remaining * capacity[i] / totalWeight);
+			allocated += share[i];
+		}
+		spreadLeftover(share, capacity, remaining - (int) allocated);
+
+		boolean any = false;
+		for (int i = 0; i < targets.size(); i++) {
+			if (held.isEmpty()) {
+				break;
+			}
+			if (share[i] <= 0) {
+				continue;
+			}
+			DepositSlot s = targets.get(i);
+			if (depositToContainerSlot(s.access(), s.slot(), held, share[i]) > 0) {
+				any = true;
+			}
+		}
+		return any;
+	}
 
     /** 槽位剩余可放容量（权重）。空槽=手持堆叠上限；同类=剩余空间；其它=0 */
     private static int slotFreeCapacity(ContainerAccess access, int slot, ItemStack held) {
@@ -636,20 +674,11 @@ public final class OutputSlotExtractor {
                 allocated += share[k];
             }
             // 余数补足给需求最大且未填满的槽位
-            int leftover = stock - (int) allocated;
-            while (leftover > 0) {
-                int best = -1;
-                for (int k = 0; k < group.size(); k++) {
-                    if (share[k] < group.get(k).need() && (best == -1 || group.get(k).need() > group.get(best).need())) {
-                        best = k;
-                    }
-                }
-                if (best == -1) {
-                    break;
-                }
-                share[best]++;
-                leftover--;
+            int[] capacity = new int[group.size()];
+            for (int k = 0; k < group.size(); k++) {
+            	capacity[k] = group.get(k).need();
             }
+            spreadLeftover(share, capacity, stock - (int) allocated);
             // 应用份额：先模拟确认可放量，再扣背包并放入，避免丢物品
             for (int k = 0; k < group.size(); k++) {
                 if (share[k] <= 0) {
