@@ -1,6 +1,7 @@
 package closedw.br.container.access;
 
 import closedw.br.container.support.ContainerAccess;
+import closedw.br.container.sync.ContainerSync;
 import closedw.br.farmersdelight.FarmersDelightSupport;
 
 import net.minecraft.world.item.ItemStack;
@@ -54,5 +55,6 @@ public final class CookingPotAccess implements ContainerAccess {
     @Override
     public void markDirty() {
         this.blockEntity.setChanged();
+        ContainerSync.sync(this.blockEntity);
     }
 }

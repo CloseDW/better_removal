@@ -6,7 +6,6 @@ import closedw.br.config.BetterRemovalConfig;
 import closedw.br.container.menu.MenuMapStore;
 import closedw.br.container.rule.SlotRuleRegistry;
 import closedw.br.container.support.ContainerRegistry;
-import closedw.br.ftbultimine.FTBUltimineSupport;
 import closedw.br.mapping.MappingSessionManager;
 import closedw.br.networking.ExtractKeyStateManager;
 import closedw.br.networking.NetworkHandler;
@@ -66,17 +65,6 @@ public final class BetterRemoval {
                     SlotRuleRegistry.configKeys(), SlotRuleRegistry.configGroups()));
             // 容器注册自检必须在这之后跑：配置项建好之前检查"配置键是否存在"会全部误报
             ContainerRegistry.validate();
-
-            // FTB Ultimine 反射联动状态：必须区分"没装"与"装了但反射接不上"——
-            // 后者会让连锁取出/放入静默失效，不打日志的话用户只能靠猜
-            if (FTBUltimineSupport.isInstalled()) {
-                if (FTBUltimineSupport.isLoaded()) {
-                    LOGGER.info("FTB Ultimine link ready");
-                }
-                else {
-                    LOGGER.warn("FTB Ultimine is installed but the reflection link is unavailable, chain extraction/deposit is disabled");
-                }
-            }
         });
     }
 

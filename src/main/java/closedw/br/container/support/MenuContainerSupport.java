@@ -38,7 +38,7 @@ public final class MenuContainerSupport implements ContainerSupport {
     @Override
     public ContainerAccess access(BlockEntity blockEntity, Player player) {
         AbstractContainerMenu menu = MenuResolver.open(blockEntity, player);
-        return menu == null ? null : new MenuSlotAccess(menu, player);
+        return menu == null ? null : new MenuSlotAccess(menu, player, blockEntity);
     }
 
     /**

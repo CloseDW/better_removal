@@ -2,12 +2,14 @@ package closedw.br.container.access;
 
 import closedw.br.container.menu.MenuResolver;
 import closedw.br.container.support.ContainerAccess;
+import closedw.br.container.sync.ContainerSync;
 
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.entity.BlockEntity;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -27,6 +29,9 @@ import java.util.Set;
  *   <li>{@link Slot#isFake()} 的槽位（合成预览等）一律不碰</li>
  * </ul>
  * 菜单是临时对象，由入口在 finally 里调用 {@link #closeAll(Player)} 统一关闭。
+ * <p>
+ * 改动提交时除了标脏被碰过的容器，还会通过 {@link ContainerSync} 把方块实体的新内容
+ * 推给客户端（该方块实体由 {@link closedw.br.container.support.MenuContainerSupport} 传入）。
  */
 public final class MenuSlotAccess implements ContainerAccess {
 
@@ -35,12 +40,15 @@ public final class MenuSlotAccess implements ContainerAccess {
 
     private final AbstractContainerMenu menu;
     private final Player player;
+    /** 菜单背后的方块实体；改动后靠它把新内容推给客户端（可能为 null：预览等无实体场景）。 */
+    private final BlockEntity blockEntity;
     /** 改动过的容器，{@link #markDirty()} 时一起标脏。 */
     private final Set<Container> touched = new LinkedHashSet<>();
 
-    public MenuSlotAccess(AbstractContainerMenu menu, Player player) {
+    public MenuSlotAccess(AbstractContainerMenu menu, Player player, BlockEntity blockEntity) {
         this.menu = menu;
         this.player = player;
+        this.blockEntity = blockEntity;
         OPEN.add(this);
     }
 
@@ -201,6 +209,8 @@ public final class MenuSlotAccess implements ContainerAccess {
             }
         }
         this.touched.clear();
+        // 菜单改动同样要推给客户端；方块实体为 null（预览等）时这里是空操作
+        ContainerSync.sync(this.blockEntity);
     }
 
     private Slot slotAt(int slot) {

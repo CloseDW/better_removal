@@ -45,8 +45,10 @@ public interface ContainerAccess {
     }
 
     /**
-     * 标记容器为脏，并执行该容器所需的同步副作用
-     * （如 Ad Astra 机器需要额外 sync()）。
+     * 标记容器为脏，并把改动后的内容推给客户端 —— 所有读写的唯一提交口。
+     * <p>
+     * 标脏负责落盘；推送统一交给 {@link closedw.br.container.sync.ContainerSync}，
+     * 它只对"会把方块实体数据发给客户端"的容器真正发包，其余容器只是标脏。
      */
     void markDirty();
 }

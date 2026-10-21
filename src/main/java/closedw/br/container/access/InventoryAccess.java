@@ -1,8 +1,8 @@
 package closedw.br.container.access;
 
-import closedw.br.adastra.AdAstraMachineSupport;
 import closedw.br.container.Stacks;
 import closedw.br.container.support.ContainerAccess;
+import closedw.br.container.sync.ContainerSync;
 
 import net.minecraft.world.Container;
 import net.minecraft.world.item.ItemStack;
@@ -99,10 +99,12 @@ public final class InventoryAccess implements ContainerAccess {
     @Override
     public void markDirty() {
         this.container.setChanged();
-        if (AdAstraMachineSupport.isAdAstraMachine(this.blockEntity)) {
-            // Ad Astra机器在物品变化后需要同步，否则客户端显示不同步
-            AdAstraMachineSupport.sync(this.blockEntity);
+        // 内部容器不一定是方块实体本身（烤炉那种反射取得的容器），只标脏容器未必会落盘
+        if (this.blockEntity != null && this.container != this.blockEntity) {
+            this.blockEntity.setChanged();
         }
+        // 客户端也缓存了物品列表的容器（如 Ad Astra 机器）靠这一句刷新，其余容器内部会跳过
+        ContainerSync.sync(this.blockEntity);
     }
 
     private boolean canPlaceItem(int slot, ItemStack stack) {

@@ -57,14 +57,6 @@ public final class FTBUltimineSupport {
     }
 
     /**
-     * 是否安装了 FTB Ultimine。
-     * 与 {@link #isLoaded()} 配对使用，才能区分"没装"和"装了但接不上"——后者必须告警。
-     */
-    public static boolean isInstalled() {
-        return LOADED;
-    }
-
-    /**
      * 是否安装了 FTB Ultimine 且官方 API 反射可用。
      */
     public static boolean isLoaded() {
